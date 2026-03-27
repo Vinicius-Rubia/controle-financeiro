@@ -1,0 +1,265 @@
+import { CreditCardIcon, PlusIcon, TagsIcon } from "lucide-react"
+import { useMemo, useState } from "react"
+import { Link } from "react-router-dom"
+import { toast } from "sonner"
+
+import { InstallmentPayDialog } from "@/components/installments/installment-pay-dialog"
+import { InstallmentPlanCancelDialog } from "@/components/installments/installment-plan-cancel-dialog"
+import { InstallmentPlanDeleteDialog } from "@/components/installments/installment-plan-delete-dialog"
+import { InstallmentPlanFormDialog } from "@/components/installments/installment-plan-form-dialog"
+import { InstallmentPlanListTable } from "@/components/installments/installment-plan-list-table"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
+import { ROUTES } from "@/constants/routes"
+import { useAccounts } from "@/hooks/use-accounts"
+import { useCards } from "@/hooks/use-cards"
+import { useCategories } from "@/hooks/use-categories"
+import { useInstallmentPlans } from "@/hooks/use-installment-plans"
+import type { Installment, InstallmentPlan } from "@/types/installment"
+
+export function ParceladasPage() {
+  const { categories } = useCategories()
+  const { accounts } = useAccounts()
+  const { cards } = useCards()
+  const { plans, create, update, remove, cancel, payInstallment } =
+    useInstallmentPlans()
+
+  const [formOpen, setFormOpen] = useState(false)
+  const [planToEdit, setPlanToEdit] = useState<InstallmentPlan | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<InstallmentPlan | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<InstallmentPlan | null>(null)
+  const [payTarget, setPayTarget] = useState<{
+    plan: InstallmentPlan
+    installment: Installment
+  } | null>(null)
+
+  const categoryNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const c of categories) m.set(c.id, c.name)
+    return m
+  }, [categories])
+
+  const accountNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const a of accounts) m.set(a.id, a.name)
+    return m
+  }, [accounts])
+
+  const cardNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const c of cards) m.set(c.id, c.name)
+    return m
+  }, [cards])
+
+  const hasCategories = categories.length > 0
+  const hasAccounts = accounts.length > 0
+
+  const sortedPlans = useMemo(
+    () =>
+      [...plans].sort((a, b) =>
+        a.title.localeCompare(b.title, "pt-BR", { sensitivity: "base" })
+      ),
+    [plans]
+  )
+
+  const openCreate = () => {
+    setPlanToEdit(null)
+    setFormOpen(true)
+  }
+
+  const confirmDelete = (): boolean => {
+    if (!deleteTarget) return false
+    try {
+      const ok = remove(deleteTarget.id)
+      if (ok) toast.success("Parcelamento excluído.")
+      else toast.error("Não foi possível excluir.")
+      return ok
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível excluir.")
+      return false
+    }
+  }
+
+  const confirmPay = (dateISO: string, settledAmount?: number) => {
+    if (!payTarget) return
+    const isCreditPayment = payTarget.plan.paymentMethod === "credit_card"
+    try {
+      payInstallment(payTarget.plan.id, payTarget.installment.id, dateISO, settledAmount)
+      toast.success(
+        isCreditPayment ? "Parcela lançada na fatura." : "Pagamento da parcela registrado."
+      )
+      setPayTarget(null)
+    } catch (e) {
+      toast.error(
+        e instanceof Error
+          ? e.message
+          : isCreditPayment
+            ? "Não foi possível lançar parcela na fatura."
+            : "Não foi possível registrar o pagamento da parcela."
+      )
+    }
+  }
+
+  const confirmCancel = (): boolean => {
+    if (!cancelTarget) return false
+    try {
+      cancel(cancelTarget.id)
+      toast.success("Parcelamento cancelado.")
+      return true
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível cancelar.")
+      return false
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+            Contas parceladas
+          </h1>
+          <p className="text-muted-foreground mt-1 max-w-xl text-sm">
+            Gerencie compras parceladas, acompanhe valores em aberto e registre
+            cada parcela conforme o meio de pagamento.
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="lg"
+          className="font-semibold shrink-0 self-start md:self-auto"
+          disabled={!hasCategories || !hasAccounts}
+          onClick={openCreate}
+        >
+          <PlusIcon data-icon="inline-start" />
+          Novo parcelamento
+        </Button>
+      </div>
+
+      {!hasCategories ? (
+        <Alert className="border bg-card shadow-sm flex items-center justify-between">
+          <div className="flex items-start gap-2">
+            <TagsIcon className="size-4" />
+            <div className="flex flex-col gap-1">
+              <AlertTitle>Cadastre categorias primeiro</AlertTitle>
+              <AlertDescription>
+                É necessário ter categorias para classificar os parcelamentos.
+              </AlertDescription>
+            </div>
+          </div>
+          <Button asChild variant="outline">
+            <Link to={ROUTES.categorias}>Ir para categorias</Link>
+          </Button>
+        </Alert>
+      ) : null}
+
+      {hasCategories && !hasAccounts ? (
+        <Alert className="border bg-card shadow-sm flex items-center justify-between">
+          <div className="flex items-start gap-2">
+            <CreditCardIcon className="size-4" />
+            <div className="flex flex-col gap-1">
+              <AlertTitle>Cadastre ao menos uma conta</AlertTitle>
+              <AlertDescription>
+                Todo parcelamento precisa de conta para registrar os pagamentos.
+              </AlertDescription>
+            </div>
+          </div>
+          <Button asChild variant="outline">
+            <Link to={ROUTES.contas}>Ir para contas</Link>
+          </Button>
+        </Alert>
+      ) : null}
+
+      {hasCategories && hasAccounts && sortedPlans.length === 0 ? (
+        <Empty className="border border-dashed bg-muted/20">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <CreditCardIcon />
+            </EmptyMedia>
+            <EmptyTitle>Nenhum parcelamento ainda</EmptyTitle>
+            <EmptyDescription>
+              Crie seu primeiro plano e acompanhe parcela por parcela.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button type="button" size="lg" className="font-semibold" onClick={openCreate}>
+              <PlusIcon data-icon="inline-start" />
+              Criar primeiro parcelamento
+            </Button>
+          </EmptyContent>
+        </Empty>
+      ) : null}
+
+      {hasCategories && hasAccounts && sortedPlans.length > 0 ? (
+        <div className="bg-card overflow-hidden rounded-xl border">
+          <div className="bg-muted/30 border-b px-6 py-4">
+            <h4 className="font-heading font-bold">Lista de parcelamentos</h4>
+          </div>
+          <InstallmentPlanListTable
+            plans={sortedPlans}
+            categoryNameById={categoryNameById}
+            accountNameById={accountNameById}
+            cardNameById={cardNameById}
+            onEdit={(plan) => {
+              setPlanToEdit(plan)
+              setFormOpen(true)
+            }}
+            onCancel={setCancelTarget}
+            onDelete={setDeleteTarget}
+            onPay={(plan, installment) => setPayTarget({ plan, installment })}
+          />
+        </div>
+      ) : null}
+
+      <InstallmentPlanFormDialog
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open)
+          if (!open) setPlanToEdit(null)
+        }}
+        categories={categories}
+        accounts={accounts}
+        cards={cards}
+        planToEdit={planToEdit}
+        onCreate={create}
+        onUpdate={update}
+      />
+
+      <InstallmentPlanDeleteDialog
+        plan={deleteTarget}
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+        onConfirm={confirmDelete}
+      />
+
+      <InstallmentPlanCancelDialog
+        plan={cancelTarget}
+        open={cancelTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setCancelTarget(null)
+        }}
+        onConfirm={confirmCancel}
+      />
+
+      <InstallmentPayDialog
+        open={payTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setPayTarget(null)
+        }}
+        plan={payTarget?.plan ?? null}
+        installment={payTarget?.installment ?? null}
+        onConfirm={confirmPay}
+      />
+    </div>
+  )
+}

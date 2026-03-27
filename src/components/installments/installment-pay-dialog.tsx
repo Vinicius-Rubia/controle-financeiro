@@ -1,6 +1,6 @@
 import { format } from "date-fns"
 import { CalendarIcon, CheckIcon } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -62,18 +62,23 @@ export function InstallmentPayDialog({
       parsedDiscountedAmount > 0 &&
       parsedDiscountedAmount <= installmentAmount)
 
-  useEffect(() => {
-    if (!open) return
+  const resetForm = () => {
     setDateISO(todayISODate())
     setPickerOpen(false)
     setHasDiscount(false)
     setDiscountedAmountInput(
       installment ? formatCurrencyInputBRFromNumber(installment.amount) : ""
     )
-  }, [open, installment])
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) resetForm()
+        onOpenChange(nextOpen)
+      }}
+    >
       <DialogContent className="sm:max-w-md" showCloseButton>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

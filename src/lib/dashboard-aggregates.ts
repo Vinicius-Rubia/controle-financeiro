@@ -295,26 +295,6 @@ function parseIsoDateOnly(value: string | undefined): Date | null {
   return new Date(y, m - 1, d)
 }
 
-function weekStartSunday(date: Date): Date {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  d.setDate(d.getDate() - d.getDay())
-  return d
-}
-
-function sameMonth(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
-}
-
-function sameWeekSundayStart(a: Date, b: Date): boolean {
-  const wa = weekStartSunday(a)
-  const wb = weekStartSunday(b)
-  return (
-    wa.getFullYear() === wb.getFullYear() &&
-    wa.getMonth() === wb.getMonth() &&
-    wa.getDate() === wb.getDate()
-  )
-}
-
 function previousMonthlyOccurrenceDate(
   occurrence: Date,
   dayOfMonth: number | undefined

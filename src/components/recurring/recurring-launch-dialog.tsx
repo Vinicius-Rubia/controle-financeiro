@@ -1,6 +1,6 @@
 import { format } from "date-fns"
 import { CalendarIcon, RocketIcon } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -55,16 +55,21 @@ export function RecurringLaunchDialog({
   const parsedAmount = parseCurrencyInputBR(amountInput)
   const isAmountValid = parsedAmount !== null
 
-  useEffect(() => {
-    if (!open) return
+  const resetForm = () => {
     setDateISO(todayISODate())
     setPickerOpen(false)
     setAmountInput(rule ? formatCurrencyInputBRFromNumber(rule.amount) : "")
     setUpdateRecurringAmount(false)
-  }, [open, rule])
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) resetForm()
+        onOpenChange(nextOpen)
+      }}
+    >
       <DialogContent className="sm:max-w-md" showCloseButton>
         <DialogHeader>
           <DialogTitle>Lançar recorrência</DialogTitle>

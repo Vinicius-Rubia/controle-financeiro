@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { PencilIcon, PlusIcon, UploadIcon, XIcon } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -55,7 +55,8 @@ const cardFormSchema = z.object({
     }, "Limite inválido."),
 })
 
-type CardFormValues = z.infer<typeof cardFormSchema>
+type CardFormValues = z.input<typeof cardFormSchema>
+type CardFormSubmitValues = z.output<typeof cardFormSchema>
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -109,14 +110,18 @@ export function CardFormDialog({
   const isEdit = cardToEdit !== null
   const [uploadingLogo, setUploadingLogo] = useState(false)
 
-  const form = useForm<CardFormValues>({
+  const form = useForm<CardFormValues, unknown, CardFormSubmitValues>({
     resolver: zodResolver(cardFormSchema),
     defaultValues: defaultValues(cardToEdit),
   })
 
-  useEffect(() => {
-    if (open) form.reset(defaultValues(cardToEdit))
-  }, [open, cardToEdit, form])
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      form.reset(defaultValues(cardToEdit))
+      setUploadingLogo(false)
+    }
+    onOpenChange(nextOpen)
+  }
 
   const onSubmit = form.handleSubmit(async (values) => {
     const nameLower = values.name.trim().toLowerCase()
@@ -159,7 +164,7 @@ export function CardFormDialog({
   })
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg" showCloseButton>
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar cartão" : "Novo cartão"}</DialogTitle>

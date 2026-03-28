@@ -63,6 +63,7 @@ export function RecurringLaunchDialog({
     parsedAmount !== null &&
     !sameMoneyAmount(parsedAmount, rule.amount)
   const showUpdateRecurringOption = launchDiffersFromRule
+  const todayStr = todayISODate()
 
   useLayoutEffect(() => {
     if (!open) return
@@ -121,9 +122,12 @@ export function RecurringLaunchDialog({
                 selected={dateISO ? isoDateToLocalDate(dateISO) : undefined}
                 onSelect={(d) => {
                   if (!d) return
-                  setDateISO(format(d, "yyyy-MM-dd"))
+                  const iso = format(d, "yyyy-MM-dd")
+                  if (iso > todayStr) return
+                  setDateISO(iso)
                   setPickerOpen(false)
                 }}
+                disabled={(day) => format(day, "yyyy-MM-dd") > todayStr}
                 weekStartsOn={1}
                 showOutsideDays
               />
@@ -174,9 +178,14 @@ export function RecurringLaunchDialog({
           </Button>
           <Button
             type="button"
-            disabled={!rule?.active || !dateISO || !isAmountValid}
+            disabled={
+              !rule?.active ||
+              !dateISO ||
+              !isAmountValid ||
+              dateISO.trim() > todayStr
+            }
             onClick={() => {
-              if (!dateISO.trim()) return
+              if (!dateISO.trim() || dateISO.trim() > todayStr) return
               onConfirm(
                 dateISO.trim(),
                 parsedAmount ?? undefined,

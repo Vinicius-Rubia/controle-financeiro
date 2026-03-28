@@ -14,6 +14,7 @@ import { formatCurrencyBRL } from "@/lib/format-currency"
 import {
   formatTransactionDate,
   paymentMethodLabel,
+  transactionCategoryDisplay,
   transactionTypeLabel,
 } from "@/lib/transaction-ui"
 import { cn } from "@/lib/utils"
@@ -66,8 +67,9 @@ export function TransactionListTable({
       </TableHeader>
       <TableBody>
         {transactions.map((t) => {
-          const cat = t.categoryId ? categoryNameById.get(t.categoryId) : undefined
+          const catLabel = transactionCategoryDisplay(t, categoryNameById)
           const isIncome = t.type === "income"
+          const editLocked = Boolean(t.transferGroupId)
           return (
             <TableRow
               key={t.id}
@@ -104,7 +106,7 @@ export function TransactionListTable({
               </TableCell>
               <TableCell className="max-w-[160px] px-6 py-4">
                 <span className="line-clamp-2 whitespace-normal">
-                  {cat ?? "—"}
+                  {catLabel}
                 </span>
               </TableCell>
               <TableCell
@@ -131,6 +133,12 @@ export function TransactionListTable({
                     type="button"
                     variant="ghost"
                     size="icon-sm"
+                    disabled={editLocked}
+                    title={
+                      editLocked
+                        ? "Transferências não podem ser editadas aqui. Exclua e registre de novo."
+                        : undefined
+                    }
                     onClick={() => onEdit(t)}
                     aria-label={`Editar ${t.title}`}
                   >

@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react"
 
 import {
+  createAccountTransfer,
   createTransaction,
   deleteTransaction,
   getTransactionById,
@@ -8,6 +9,7 @@ import {
   updateTransaction,
 } from "@/services/localStorage/finance-storage"
 import type {
+  CreateAccountTransferInput,
   CreateTransactionInput,
   Transaction,
   UpdateTransactionInput,
@@ -48,12 +50,21 @@ export function useTransactions() {
     [refresh]
   )
 
+  const transferBetweenAccounts = useCallback(
+    (input: CreateAccountTransferInput) => {
+      createAccountTransfer(input)
+      refresh()
+    },
+    [refresh]
+  )
+
   return {
     transactions,
     refresh,
     create,
     update,
     remove,
+    transferBetweenAccounts,
     getById: getTransactionById,
   }
 }

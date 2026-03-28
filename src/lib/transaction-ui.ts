@@ -1,4 +1,8 @@
-import type { PaymentMethod, TransactionType } from "@/types/transaction"
+import type {
+  PaymentMethod,
+  Transaction,
+  TransactionType,
+} from "@/types/transaction"
 
 const LABELS: Record<TransactionType, string> = {
   income: "Entrada",
@@ -16,10 +20,24 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   boleto: "Boleto",
   cash: "Dinheiro",
   credit_card_settlement: "Pagamento de fatura",
+  account_transfer: "Transferência entre contas",
 }
 
 export function paymentMethodLabel(method: PaymentMethod): string {
   return PAYMENT_METHOD_LABELS[method]
+}
+
+export function transactionCategoryDisplay(
+  t: Transaction,
+  categoryNameById: Map<string, string>
+): string {
+  if (t.categoryId) {
+    return categoryNameById.get(t.categoryId) ?? "—"
+  }
+  if (t.paymentMethod === "account_transfer") {
+    return "Transferência entre contas"
+  }
+  return "—"
 }
 
 /** `date` no formato `YYYY-MM-DD` (armazenado na transação). */

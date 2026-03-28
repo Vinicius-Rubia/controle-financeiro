@@ -1,6 +1,6 @@
 import { format } from "date-fns"
 import { CalendarIcon, RocketIcon } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useLayoutEffect, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -33,6 +33,10 @@ function isoDateToLocalDate(iso: string): Date {
   return new Date(year, month - 1, day)
 }
 
+function sameMoneyAmount(a: number, b: number): boolean {
+  return Math.round(a * 100) === Math.round(b * 100)
+}
+
 export function RecurringLaunchDialog({
   open,
   onOpenChange,
@@ -54,22 +58,30 @@ export function RecurringLaunchDialog({
   const [updateRecurringAmount, setUpdateRecurringAmount] = useState(false)
   const parsedAmount = parseCurrencyInputBR(amountInput)
   const isAmountValid = parsedAmount !== null
+  const launchDiffersFromRule =
+    rule !== null &&
+    parsedAmount !== null &&
+    !sameMoneyAmount(parsedAmount, rule.amount)
+  const showUpdateRecurringOption = launchDiffersFromRule
 
-  const resetForm = () => {
+  useLayoutEffect(() => {
+    if (!open) return
     setDateISO(todayISODate())
     setPickerOpen(false)
-    setAmountInput(rule ? formatCurrencyInputBRFromNumber(rule.amount) : "")
+    if (rule) {
+      setAmountInput(formatCurrencyInputBRFromNumber(rule.amount))
+    } else {
+      setAmountInput("")
+    }
     setUpdateRecurringAmount(false)
-  }
+  }, [open, rule?.id, rule?.amount])
+
+  useEffect(() => {
+    if (!launchDiffersFromRule) setUpdateRecurringAmount(false)
+  }, [launchDiffersFromRule])
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (nextOpen) resetForm()
-        onOpenChange(nextOpen)
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md" showCloseButton>
         <DialogHeader>
           <DialogTitle>Lançar recorrência</DialogTitle>
@@ -137,20 +149,24 @@ export function RecurringLaunchDialog({
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-2">
-          <p className="text-muted-foreground text-sm font-medium">Aplicar para próximos lançamentos</p>
-          <div className="flex items-center gap-2">
-            <Toggle
-              type="button"
-              variant="outline"
-              pressed={updateRecurringAmount}
-              onPressedChange={setUpdateRecurringAmount}
-              disabled={!rule?.active || !isAmountValid}
-            >
-              {updateRecurringAmount ? "Atualizar recorrência" : "Não atualizar recorrência"}
-            </Toggle>
+        {showUpdateRecurringOption ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-muted-foreground text-sm font-medium">
+              Aplicar para próximos lançamentos
+            </p>
+            <div className="flex items-center gap-2">
+              <Toggle
+                type="button"
+                variant="outline"
+                pressed={updateRecurringAmount}
+                onPressedChange={setUpdateRecurringAmount}
+                disabled={!rule?.active || !isAmountValid}
+              >
+                {updateRecurringAmount ? "Atualizar recorrência" : "Não atualizar recorrência"}
+              </Toggle>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <DialogFooter className="gap-2 sm:justify-end">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -161,7 +177,11 @@ export function RecurringLaunchDialog({
             disabled={!rule?.active || !dateISO || !isAmountValid}
             onClick={() => {
               if (!dateISO.trim()) return
-              onConfirm(dateISO.trim(), parsedAmount ?? undefined, updateRecurringAmount)
+              onConfirm(
+                dateISO.trim(),
+                parsedAmount ?? undefined,
+                showUpdateRecurringOption ? updateRecurringAmount : false
+              )
             }}
           >
             <RocketIcon data-icon="inline-start" />

@@ -1,5 +1,7 @@
+import { accountNetBalanceThroughDate } from "@/lib/account-ui"
 import { cardSupportsPaymentMethod } from "@/lib/card-ui"
 import { cycleOutstanding, totalCreditOutstanding } from "@/lib/credit-statement"
+import { todayISODate } from "@/lib/transaction-ui"
 import { categoryAcceptsTransactionType } from "@/services/category-service"
 import type {
   Account,
@@ -20,6 +22,7 @@ import type {
   UpdateRecurringRuleInput,
 } from "@/types/recurring"
 import type {
+  CreateAccountTransferInput,
   CreateTransactionInput,
   PaymentMethod,
   Transaction,
@@ -368,6 +371,7 @@ const VALID_PAYMENT_METHODS: Set<PaymentMethod> = new Set([
   "boleto",
   "cash",
   "credit_card_settlement",
+  "account_transfer",
 ])
 
 function assertTransactionCardConsistency(tx: {
@@ -413,6 +417,7 @@ function normalizeCategoryId(
   categoryId?: string
 ): string | undefined {
   if (paymentMethod === "credit_card_settlement") return undefined
+  if (paymentMethod === "account_transfer") return undefined
   const trimmed = categoryId?.trim()
   return trimmed || undefined
 }
@@ -645,13 +650,24 @@ export function createTransaction(
     input.paymentMethod,
     input.categoryId
   )
-  if (input.paymentMethod !== "credit_card_settlement") {
+  if (
+    input.paymentMethod !== "credit_card_settlement" &&
+    input.paymentMethod !== "account_transfer"
+  ) {
     const category = getCategoryById(normalizedCategoryId as string)
     if (!category) {
       throw new Error("Categoria não encontrada.")
     }
     if (!categoryAcceptsTransactionType(category, input.type)) {
       throw new Error("Tipo de lançamento incompatível com a categoria.")
+    }
+  }
+  if (input.paymentMethod === "account_transfer") {
+    if (input.cardId?.trim()) {
+      throw new Error("Transferência entre contas não utiliza cartão.")
+    }
+    if (input.statementPeriodKey?.trim()) {
+      throw new Error("Transferências não utilizam dados de fatura.")
     }
   }
   assertTransactionCardConsistency({
@@ -673,7 +689,16 @@ export function createTransaction(
     cardId: input.cardId?.trim(),
     statementPeriodKey,
   })
+  const txDateStr = input.date.trim()
+  if (txDateStr > todayISODate()) {
+    throw new Error("Não é possível registrar lançamento em data futura.")
+  }
   const now = new Date().toISOString()
+  const cardIdStored =
+    input.paymentMethod === "account_transfer"
+      ? undefined
+      : input.cardId?.trim()
+  const transferGroupId = input.transferGroupId?.trim() || undefined
   return transactionsRepo.create(() => ({
     id: crypto.randomUUID(),
     title: input.title.trim(),
@@ -682,8 +707,9 @@ export function createTransaction(
     categoryId: normalizedCategoryId,
     paymentMethod: input.paymentMethod,
     accountId: accountId as string,
-    cardId: input.cardId?.trim(),
+    cardId: cardIdStored,
     statementPeriodKey,
+    transferGroupId,
     date: input.date.trim(),
     description: input.description,
     createdAt: now,
@@ -698,6 +724,7 @@ export function updateTransaction(
   migrateTransactionsFromLegacyOnce()
   const current = transactionsRepo.getById(input.id)
   if (!current) return null
+  if (current.transferGroupId) return null
 
   const { id, ...rest } = input
   const patch = omitUndefined(rest) as Partial<Omit<Transaction, "id">>
@@ -713,7 +740,10 @@ export function updateTransaction(
   if (!VALID_PAYMENT_METHODS.has(merged.paymentMethod)) return null
 
   merged.categoryId = normalizeCategoryId(merged.paymentMethod, merged.categoryId)
-  if (merged.paymentMethod !== "credit_card_settlement") {
+  if (
+    merged.paymentMethod !== "credit_card_settlement" &&
+    merged.paymentMethod !== "account_transfer"
+  ) {
     const category = getCategoryById(merged.categoryId as string)
     if (!category) return null
     if (!categoryAcceptsTransactionType(category, merged.type)) return null
@@ -730,6 +760,10 @@ export function updateTransaction(
     merged.paymentMethod === "credit_card_settlement" &&
     !merged.statementPeriodKey
   ) {
+    return null
+  }
+
+  if (merged.date.trim() > todayISODate()) {
     return null
   }
 
@@ -765,7 +799,107 @@ export function updateTransaction(
 export function deleteTransaction(id: string): boolean {
   migrateCategoriesFromLegacyOnce()
   migrateTransactionsFromLegacyOnce()
+  const tx = transactionsRepo.getById(id)
+  if (!tx) return false
+  const group = tx.transferGroupId?.trim()
+  if (group) {
+    const ids = transactionsRepo
+      .list()
+      .filter((t) => t.transferGroupId === group)
+      .map((t) => t.id)
+    let ok = true
+    for (const tid of ids) {
+      if (!transactionsRepo.remove(tid)) ok = false
+    }
+    return ok
+  }
   return transactionsRepo.remove(id)
+}
+
+/**
+ * Registra transferência entre duas contas correntes ativas: uma saída na origem
+ * e uma entrada no destino, vinculadas por `transferGroupId`.
+ */
+export function createAccountTransfer(
+  input: CreateAccountTransferInput
+): { outgoingId: string; incomingId: string } {
+  migrateCategoriesFromLegacyOnce()
+  migrateTransactionsFromLegacyOnce()
+
+  const fromAcc = getAccountById(input.fromAccountId.trim())
+  const toAcc = getAccountById(input.toAccountId.trim())
+  if (!fromAcc || !toAcc) {
+    throw new Error("Conta não encontrada.")
+  }
+  if (!fromAcc.active || !toAcc.active) {
+    throw new Error("Use apenas contas ativas.")
+  }
+  if (fromAcc.kind !== "checking" || toAcc.kind !== "checking") {
+    throw new Error("A transferência só é permitida entre contas correntes.")
+  }
+  if (fromAcc.id === toAcc.id) {
+    throw new Error("Origem e destino devem ser contas diferentes.")
+  }
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    throw new Error("Informe um valor maior que zero.")
+  }
+  const date = input.date.trim()
+  if (!date) throw new Error("Informe a data.")
+  parseISODateParts(date)
+  if (date > todayISODate()) {
+    throw new Error("Não é possível registrar transferência em data futura.")
+  }
+
+  const available = accountNetBalanceThroughDate(
+    transactionsRepo.list(),
+    fromAcc.id,
+    date
+  )
+  if (available < input.amount) {
+    throw new Error(
+      "Saldo insuficiente na conta de origem para esta data e valor."
+    )
+  }
+
+  const description =
+    typeof input.description === "string" ? input.description : ""
+  const groupId = crypto.randomUUID()
+  const outTitle = `Transferência para ${toAcc.name.trim()}`
+  const inTitle = `Transferência de ${fromAcc.name.trim()}`
+
+  const common = {
+    amount: input.amount,
+    paymentMethod: "account_transfer" as const,
+    date,
+    description,
+    transferGroupId: groupId,
+  }
+
+  let outgoing: Transaction
+  try {
+    outgoing = createTransaction({
+      ...common,
+      title: outTitle,
+      type: "expense",
+      accountId: fromAcc.id,
+    })
+  } catch (e) {
+    throw e
+  }
+  try {
+    const incoming = createTransaction({
+      ...common,
+      title: inTitle,
+      type: "income",
+      accountId: toAcc.id,
+    })
+    return { outgoingId: outgoing.id, incomingId: incoming.id }
+  } catch (e) {
+    transactionsRepo.remove(outgoing.id)
+    throw e instanceof Error
+      ? e
+      : new Error("Não foi possível concluir a transferência.")
+  }
 }
 
 // ——— Recorrências ———
@@ -991,7 +1125,7 @@ export function launchRecurringRule(
 
 /**
  * Recorrências mensais com autopost: cria o lançamento uma vez no mês,
- * após o dia configurado, ao carregar o app.
+ * no dia configurado ou depois, ao carregar o app.
  */
 export function sweepAutoPostRecurringRules(): void {
   migrateCategoriesFromLegacyOnce()

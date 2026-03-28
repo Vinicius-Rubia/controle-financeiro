@@ -74,7 +74,7 @@ function firstCategoryIdForType(
 function recurringPaymentMethodForForm(
   pm: PaymentMethod
 ): "pix" | "debit_card" | "credit_card" | "boleto" | "cash" {
-  if (pm === "credit_card_settlement") return "pix"
+  if (pm === "credit_card_settlement" || pm === "account_transfer") return "pix"
   if (pm === "debit_card") return "debit_card"
   if (pm === "credit_card") return "credit_card"
   if (pm === "boleto") return "boleto"
@@ -450,9 +450,6 @@ export function RecurringFormDialog({
                     />
                   )}
                 />
-                <FieldDescription className="text-xs">
-                  A vírgula é aplicada automaticamente conforme digita.
-                </FieldDescription>
                 <FieldError errors={[form.formState.errors.amount]} />
               </Field>
 
@@ -508,9 +505,6 @@ export function RecurringFormDialog({
                     </span>
                   )}
                 </div>
-                <FieldDescription className="text-xs">
-                  Aparece na lista de recorrências ao lado do título.
-                </FieldDescription>
               </Field>
 
               <Field
@@ -786,8 +780,8 @@ export function RecurringFormDialog({
                     )}
                   />
                   <FieldDescription className="text-xs">
-                    Depois do dia do mês acima, cria uma movimentação ao abrir o
-                    app, no máximo uma vez por mês (calendário local).
+                    No dia do mês acima ou depois, ao abrir o app cria uma
+                    movimentação; no máximo uma vez por mês (calendário local).
                   </FieldDescription>
                   <FieldError errors={[form.formState.errors.autoPost]} />
                 </Field>

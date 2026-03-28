@@ -11,6 +11,8 @@ import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { toast } from "sonner"
 
+import { AccountTransferDialog } from "@/components/accounts/account-transfer-dialog"
+import { AccountTransferToolbarButton } from "@/components/accounts/account-transfer-toolbar-button"
 import { TransactionDeleteDialog } from "@/components/transactions/transaction-delete-dialog"
 import { TransactionFilters } from "@/components/transactions/transaction-filters"
 import { TransactionFormDialog } from "@/components/transactions/transaction-form-dialog"
@@ -50,9 +52,11 @@ export function MovimentacoesPage() {
   const { categories } = useCategories()
   const { accounts } = useAccounts()
   const { cards } = useCards()
-  const { transactions, create, update, remove } = useTransactions()
+  const { transactions, create, update, remove, transferBetweenAccounts } =
+    useTransactions()
 
   const [filters, setFilters] = useState<TransactionListFilters>(initialFilters)
+  const [transferOpen, setTransferOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [transactionToEdit, setTransactionToEdit] =
     useState<Transaction | null>(null)
@@ -83,6 +87,11 @@ export function MovimentacoesPage() {
     return m
   }, [accounts])
 
+  const checkingAccounts = useMemo(
+    () => accounts.filter((a) => a.active && a.kind === "checking"),
+    [accounts]
+  )
+
   const filteredTotals = useMemo(() => {
     let income = 0
     let expense = 0
@@ -99,6 +108,7 @@ export function MovimentacoesPage() {
   }, [filteredTransactions])
 
   const hasCategories = categories.length > 0
+  const hasAccounts = accounts.length > 0
   const filtersActive = useMemo(() => {
     return (
       filters.type !== "all" ||
@@ -124,9 +134,15 @@ export function MovimentacoesPage() {
   const confirmDelete = (): boolean => {
     const id = deleteTarget?.id
     if (!id) return false
+    const pair = Boolean(deleteTarget.transferGroupId)
     const ok = remove(id)
-    if (ok) toast.success("Lançamento excluído.")
-    else toast.error("Não foi possível excluir o lançamento.")
+    if (ok) {
+      toast.success(
+        pair
+          ? "Transferência excluída (saída e entrada)."
+          : "Lançamento excluído."
+      )
+    } else toast.error("Não foi possível excluir o lançamento.")
     return ok
   }
 
@@ -142,16 +158,22 @@ export function MovimentacoesPage() {
             acompanhe totais no mesmo padrão do painel de relatórios.
           </p>
         </div>
-        <Button
-          type="button"
-          size="lg"
-          className="font-semibold shrink-0 self-start md:self-auto"
-          disabled={!hasCategories}
-          onClick={openCreate}
-        >
-          <PlusIcon data-icon="inline-start" />
-          Novo lançamento
-        </Button>
+        <div className="flex shrink-0 flex-col gap-2 self-start sm:flex-row sm:items-center md:self-auto">
+          <AccountTransferToolbarButton
+            enabled={checkingAccounts.length >= 2}
+            onPress={() => setTransferOpen(true)}
+          />
+          <Button
+            type="button"
+            size="lg"
+            className="font-semibold"
+            disabled={!hasCategories || !hasAccounts}
+            onClick={openCreate}
+          >
+            <PlusIcon data-icon="inline-start" />
+            Novo lançamento
+          </Button>
+        </div>
       </div>
 
       {!hasCategories ? (
@@ -175,26 +197,28 @@ export function MovimentacoesPage() {
         </Alert>
       ) : null}
 
-      {hasCategories && accounts.length === 0 ? (
-        <Alert className="border bg-card shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-2">
-            <LandmarkIcon className="size-4 shrink-0" />
-            <div className="flex flex-col gap-1">
-              <AlertTitle>Cadastre ao menos uma conta</AlertTitle>
-              <AlertDescription>
-                Todo lançamento exige uma conta. Pix, dinheiro e saídas imediatas
-                alteram o saldo na hora; no crédito, a mesma conta serve de
-                referência e para pagar a fatura.
-              </AlertDescription>
-            </div>
-          </div>
-          <Button asChild variant="outline" className="shrink-0 self-start sm:self-auto">
-            <Link to={ROUTES.contas}>Ir para contas</Link>
-          </Button>
-        </Alert>
+      {hasCategories && !hasAccounts ? (
+        <Empty className="border border-dashed bg-muted/20">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <LandmarkIcon />
+            </EmptyMedia>
+            <EmptyTitle>Cadastre ao menos uma conta</EmptyTitle>
+            <EmptyDescription>
+              Todo lançamento exige uma conta. Pix, dinheiro e saídas imediatas
+              alteram o saldo na hora; no crédito, a mesma conta serve de
+              referência e para pagar a fatura.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button asChild variant="default" size="lg" className="font-semibold">
+              <Link to={ROUTES.contas}>Ir para contas</Link>
+            </Button>
+          </EmptyContent>
+        </Empty>
       ) : null}
 
-      {hasCategories ? (
+      {hasCategories && hasAccounts ? (
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div className="bg-card rounded-xl border p-6">
@@ -281,7 +305,7 @@ export function MovimentacoesPage() {
         </>
       ) : null}
 
-      {hasCategories && transactions.length === 0 ? (
+      {hasCategories && hasAccounts && transactions.length === 0 ? (
         <Empty className="border border-dashed bg-muted/20">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -302,7 +326,10 @@ export function MovimentacoesPage() {
         </Empty>
       ) : null}
 
-      {hasCategories && transactions.length > 0 && filteredTransactions.length === 0 ? (
+      {hasCategories &&
+      hasAccounts &&
+      transactions.length > 0 &&
+      filteredTransactions.length === 0 ? (
         <Empty className="border border-dashed bg-muted/20">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -326,7 +353,7 @@ export function MovimentacoesPage() {
         </Empty>
       ) : null}
 
-      {hasCategories && filteredTransactions.length > 0 ? (
+      {hasCategories && hasAccounts && filteredTransactions.length > 0 ? (
         <div className="bg-card overflow-hidden rounded-xl border">
           <div className="bg-muted/30 border-b px-6 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -379,6 +406,14 @@ export function MovimentacoesPage() {
         transactionToEdit={transactionToEdit}
         onCreate={create}
         onUpdate={update}
+      />
+
+      <AccountTransferDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        checkingAccounts={checkingAccounts}
+        transactions={transactions}
+        onTransfer={transferBetweenAccounts}
       />
 
       <TransactionDeleteDialog

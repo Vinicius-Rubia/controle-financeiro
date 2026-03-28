@@ -6,6 +6,7 @@ import { CategoriasPage } from "@/pages/categorias-page"
 import { ContasPage } from "@/pages/contas-page"
 import { CartoesPage } from "@/pages/cartoes-page"
 import { DashboardPage } from "@/pages/dashboard-page"
+import { DadosPage } from "@/pages/dados-page"
 import { MovimentacoesPage } from "@/pages/movimentacoes-page"
 import { ParceladasPage } from "@/pages/parceladas-page"
 import { RecorrenciasPage } from "@/pages/recorrencias-page"
@@ -22,6 +23,7 @@ export function AppRoutes() {
         <Route path="parcelamentos" element={<ParceladasPage />} />
         <Route path="movimentacoes" element={<MovimentacoesPage />} />
         <Route path="recorrencias" element={<RecorrenciasPage />} />
+        <Route path="dados" element={<DadosPage />} />
       </Route>
       <Route path="*" element={<Navigate to={ROUTES.dashboard} replace />} />
     </Routes>

@@ -91,6 +91,7 @@ const transactionFormSchema = z.object({
     "boleto",
     "cash",
     "credit_card_settlement",
+    "account_transfer",
   ]),
   accountId: z.string().min(1, "Selecione a conta."),
   cardId: z.string().optional(),
@@ -135,8 +136,11 @@ function defaultValues(
     accountId: transaction.accountId ?? "",
     cardId: transaction.cardId ?? "",
     statementPeriodKey: transaction.statementPeriodKey ?? "",
-    categoryId: transaction.categoryId,
-    date: transaction.date,
+    categoryId:
+      transaction.categoryId ??
+      firstCategoryIdForType(categories, transaction.type),
+    date:
+      transaction.date > todayISODate() ? todayISODate() : transaction.date,
     description: transaction.description,
   }
 }
@@ -344,6 +348,8 @@ export function TransactionFormDialog({
     transactionToEdit,
   ])
 
+  const todayStr = todayISODate()
+
   const onSubmit = form.handleSubmit(async (values) => {
     await new Promise((r) => requestAnimationFrame(r))
 
@@ -363,6 +369,14 @@ export function TransactionFormDialog({
       return
     }
 
+    const dateTrimmed = values.date.trim()
+    if (dateTrimmed > todayStr) {
+      form.setError("date", {
+        message: "Não é possível usar data futura.",
+      })
+      return
+    }
+
     const payloadBase = {
       title: values.title.trim(),
       amount,
@@ -375,7 +389,7 @@ export function TransactionFormDialog({
         values.paymentMethod === "credit_card_settlement"
           ? undefined
           : values.categoryId?.trim() || undefined,
-      date: values.date,
+      date: dateTrimmed,
       description: values.description.trim(),
     }
 
@@ -468,9 +482,6 @@ export function TransactionFormDialog({
                     />
                   )}
                 />
-                <FieldDescription>
-                  A vírgula é aplicada automaticamente conforme digita.
-                </FieldDescription>
                 <FieldError errors={[form.formState.errors.amount]} />
             </Field>
 
@@ -511,12 +522,15 @@ export function TransactionFormDialog({
                         selected={txDate ? isoDateToLocalDate(txDate) : undefined}
                         onSelect={(d) => {
                           if (!d) return
-                          form.setValue("date", format(d, "yyyy-MM-dd"), {
+                          const iso = format(d, "yyyy-MM-dd")
+                          if (iso > todayStr) return
+                          form.setValue("date", iso, {
                             shouldDirty: true,
                             shouldValidate: true,
                           })
                           setDateOpen(false)
                         }}
+                        disabled={(day) => format(day, "yyyy-MM-dd") > todayStr}
                         weekStartsOn={1}
                         showOutsideDays
                       />
@@ -528,6 +542,7 @@ export function TransactionFormDialog({
                   className="sr-only"
                   aria-hidden
                   tabIndex={-1}
+                  max={todayStr}
                   {...form.register("date")}
                 />
                 <FieldError errors={[form.formState.errors.date]} />

@@ -1,5 +1,6 @@
-import { CreditCardIcon, PlusIcon } from "lucide-react"
+import { CreditCardIcon, LandmarkIcon, PlusIcon } from "lucide-react"
 import { useMemo, useState } from "react"
+import { Link } from "react-router-dom"
 import { toast } from "sonner"
 
 import { CardDeleteDialog } from "@/components/cards/card-delete-dialog"
@@ -8,6 +9,7 @@ import { CardListCards } from "@/components/cards/card-list-cards"
 import { CardListTable } from "@/components/cards/card-list-table"
 import { CardStatementSheet } from "@/components/cards/card-statement-sheet"
 import { Button } from "@/components/ui/button"
+import { ROUTES } from "@/constants/routes"
 import {
   Empty,
   EmptyContent,
@@ -74,12 +76,43 @@ export function CartoesPage() {
     return ok
   }
 
+  const hasAccounts = accounts.length > 0
   const hasCards = cards.length > 0
   const activeCount = cards.filter((c) => c.active).length
 
   return (
     <div className="flex flex-col gap-8">
-      {!hasCards ? (
+      {!hasAccounts ? (
+        <>
+          <div>
+            <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+              Cartões
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Cada cartão fica vinculado a uma conta para fechamento e pagamento
+              da fatura.
+            </p>
+          </div>
+          <Empty className="border border-dashed bg-muted/20">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <LandmarkIcon />
+              </EmptyMedia>
+              <EmptyTitle>Cadastre ao menos uma conta</EmptyTitle>
+              <EmptyDescription>
+                Para criar um cartão, é preciso ter uma conta corrente ou
+                equivalente cadastrada. Ela será usada como conta de cobrança da
+                fatura.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button asChild size="lg" className="font-semibold">
+                <Link to={ROUTES.contas}>Ir para contas</Link>
+              </Button>
+            </EmptyContent>
+          </Empty>
+        </>
+      ) : !hasCards ? (
         <>
           <div>
             <h1 className="font-heading text-3xl font-extrabold tracking-tight">

@@ -4,6 +4,8 @@ import { toast } from "sonner"
 
 import { AccountDeleteDialog } from "@/components/accounts/account-delete-dialog"
 import { AccountFormDialog } from "@/components/accounts/account-form-dialog"
+import { AccountTransferDialog } from "@/components/accounts/account-transfer-dialog"
+import { AccountTransferToolbarButton } from "@/components/accounts/account-transfer-toolbar-button"
 import { AccountListCards } from "@/components/accounts/account-list-cards"
 import { AccountListTable } from "@/components/accounts/account-list-table"
 import { Button } from "@/components/ui/button"
@@ -21,9 +23,10 @@ import type { Account } from "@/types/account"
 
 export function ContasPage() {
   const { accounts, create, update, remove } = useAccounts()
-  const { transactions } = useTransactions()
+  const { transactions, transferBetweenAccounts } = useTransactions()
 
   const [formOpen, setFormOpen] = useState(false)
+  const [transferOpen, setTransferOpen] = useState(false)
   const [accountToEdit, setAccountToEdit] = useState<Account | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null)
 
@@ -33,6 +36,11 @@ export function ContasPage() {
         a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })
       ),
     [accounts]
+  )
+
+  const checkingAccounts = useMemo(
+    () => sortedAccounts.filter((a) => a.active && a.kind === "checking"),
+    [sortedAccounts]
   )
 
   const openCreate = () => {
@@ -105,10 +113,21 @@ export function ContasPage() {
                 fatura). Dívida de cartão fica na fatura até liquidar.
               </p>
             </div>
-            <Button type="button" size="lg" className="font-semibold" onClick={openCreate}>
-              <PlusIcon data-icon="inline-start" />
-              Nova conta
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <AccountTransferToolbarButton
+                enabled={checkingAccounts.length >= 2}
+                onPress={() => setTransferOpen(true)}
+              />
+              <Button
+                type="button"
+                size="lg"
+                className="font-semibold"
+                onClick={openCreate}
+              >
+                <PlusIcon data-icon="inline-start" />
+                Nova conta
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -160,6 +179,14 @@ export function ContasPage() {
           if (!open) setDeleteTarget(null)
         }}
         onConfirm={confirmDelete}
+      />
+
+      <AccountTransferDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        checkingAccounts={checkingAccounts}
+        transactions={transactions}
+        onTransfer={transferBetweenAccounts}
       />
     </div>
   )

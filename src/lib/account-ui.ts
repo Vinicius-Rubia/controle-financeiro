@@ -41,3 +41,24 @@ export function accountNetBalance(
   }
   return bal
 }
+
+/**
+ * Saldo líquido na conta até a data informada (inclusive), só com lançamentos
+ * que movimentam caixa e com `date` <= `throughDateIso` (YYYY-MM-DD).
+ */
+export function accountNetBalanceThroughDate(
+  transactions: Transaction[],
+  accountId: string,
+  throughDateIso: string
+): number {
+  const cutoff = throughDateIso.trim()
+  let bal = 0
+  for (const t of transactions) {
+    if (t.accountId !== accountId) continue
+    if (!transactionAffectsCashBalance(t)) continue
+    if (t.date > cutoff) continue
+    if (t.type === "income") bal += t.amount
+    else bal -= t.amount
+  }
+  return bal
+}

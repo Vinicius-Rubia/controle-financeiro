@@ -1,5 +1,11 @@
 import type { PaymentMethod, TransactionType } from "./transaction"
 
+/** Meios permitidos em parcelamentos (sem liquidação de fatura nem transferência entre contas). */
+export type InstallmentPaymentMethod = Exclude<
+  PaymentMethod,
+  "credit_card_settlement" | "account_transfer"
+>
+
 export type InstallmentPlanStatus = "active" | "completed" | "cancelled"
 export type InstallmentStatus = "reserved" | "posted" | "cancelled"
 
@@ -23,7 +29,7 @@ export interface InstallmentPlan {
   installmentCount: number
   type: TransactionType
   categoryId: string
-  paymentMethod: Exclude<PaymentMethod, "credit_card_settlement">
+  paymentMethod: InstallmentPaymentMethod
   accountId: string
   cardId?: string
   description: string

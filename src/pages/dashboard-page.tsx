@@ -3,10 +3,7 @@ import {
   ArrowUpRightIcon,
   BarChart3Icon,
   CreditCard,
-  LayoutDashboardIcon,
-  ListIcon,
   Plus,
-  TagsIcon,
   WalletIcon,
 } from "lucide-react"
 import { useId, useMemo } from "react"
@@ -36,14 +33,6 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty"
 import {
   Table,
   TableBody,
@@ -267,355 +256,439 @@ export function DashboardPage() {
   }, [monthlyFlow])
 
   const hasTransactions = transactions.length > 0
+  const hasMonthlyFlow = monthlyFlow.length > 0
 
   return (
     <div className="flex flex-col gap-8">
-      {!hasTransactions ? (
-        <>
-          <div>
-            <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-              Relatórios financeiros
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Análise do fluxo de caixa com base nos seus lançamentos.
-            </p>
-          </div>
-          <Empty className="border border-dashed bg-muted/20">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <LayoutDashboardIcon />
-              </EmptyMedia>
-              <EmptyTitle>Nada para exibir ainda</EmptyTitle>
-              <EmptyDescription>
-                Cadastre categorias e registre entradas e saídas para ver totais,
-                evolução mensal e distribuição por categoria.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-              <Button asChild variant="outline">
-                <Link to={ROUTES.categorias}>
-                  <TagsIcon data-icon="inline-start" />
-                  Ir para categorias
-                </Link>
-              </Button>
-              <Button asChild>
-                <Link to={ROUTES.movimentacoes}>
-                  <ListIcon data-icon="inline-start" />
-                  Ir para movimentações
-                </Link>
-              </Button>
-            </EmptyContent>
-          </Empty>
-        </>
-      ) : (
-        <>
-          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-                Relatórios financeiros
-              </h1>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Análise detalhada do seu fluxo de caixa (dados locais).
-              </p>
+      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+            Relatórios financeiros
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Análise do seu fluxo de caixa com base nos lançamentos (dados
+            locais).
+          </p>
+        </div>
+        <Button size="lg" className="font-semibold" asChild>
+          <Link to={ROUTES.movimentacoes}>
+            <Plus data-icon="inline-start" />
+            Novo lançamento
+          </Link>
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+        <div className="bg-card rounded-xl border p-6">
+          <div className="mb-4 flex items-start justify-between">
+            <div className="rounded-lg bg-emerald-500/15 p-2">
+              <ArrowUpRightIcon className="size-5 text-emerald-500" />
             </div>
-            <Button
-              size="lg"
-              className="font-semibold"
-              asChild
-            >
-              <Link to={ROUTES.movimentacoes}>
-                <Plus data-icon="inline-start" />
-                Novo lançamento
+            {incomeExpenseMoM.incomePct ? (
+              <span
+                className={cn(
+                  "rounded px-2 py-0.5 text-xs font-medium",
+                  incomeExpenseMoM.incomePct.startsWith("-")
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                )}
+              >
+                {incomeExpenseMoM.incomePct}
+              </span>
+            ) : (
+              <span className="text-muted-foreground px-2 py-0.5 text-xs">
+                mês a mês
+              </span>
+            )}
+          </div>
+          <p className="text-muted-foreground text-sm font-medium">
+            Total de entradas
+          </p>
+          <p className="text-muted-foreground text-xs">
+            Competência (inclui crédito não pago no caixa).
+          </p>
+          <h3 className="mt-1 font-heading text-2xl font-bold tabular-nums tracking-tight">
+            {formatCurrencyBRL(totals.totalIncome)}
+          </h3>
+          {!hasTransactions ? (
+            <p className="text-muted-foreground mt-3 border-t pt-3 text-xs leading-relaxed">
+              Registre lançamentos do tipo{" "}
+              <span className="text-foreground font-medium">entrada</span> em{" "}
+              <Link
+                to={ROUTES.movimentacoes}
+                className="text-primary font-medium underline-offset-4 hover:underline"
+              >
+                Movimentações
+              </Link>{" "}
+              para o total aparecer aqui.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="bg-card rounded-xl border p-6">
+          <div className="mb-4 flex items-start justify-between">
+            <div className="rounded-lg bg-destructive/15 p-2">
+              <ArrowDownLeftIcon className="text-destructive size-5" />
+            </div>
+            {incomeExpenseMoM.expensePct ? (
+              <span
+                className={cn(
+                  "rounded px-2 py-0.5 text-xs font-medium",
+                  incomeExpenseMoM.expensePct.startsWith("-")
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    : "bg-destructive/10 text-destructive"
+                )}
+              >
+                {incomeExpenseMoM.expensePct}
+              </span>
+            ) : (
+              <span className="text-muted-foreground px-2 py-0.5 text-xs">
+                mês a mês
+              </span>
+            )}
+          </div>
+          <p className="text-muted-foreground text-sm font-medium">
+            Total de saídas
+          </p>
+          <p className="text-muted-foreground text-xs">
+            Competência (compras no crédito contam aqui).
+          </p>
+          <h3 className="mt-1 font-heading text-2xl font-bold tabular-nums tracking-tight">
+            {formatCurrencyBRL(totals.totalExpense)}
+          </h3>
+          {!hasTransactions ? (
+            <p className="text-muted-foreground mt-3 border-t pt-3 text-xs leading-relaxed">
+              Registre{" "}
+              <span className="text-foreground font-medium">saídas</span> (e
+              compras no crédito) em{" "}
+              <Link
+                to={ROUTES.movimentacoes}
+                className="text-primary font-medium underline-offset-4 hover:underline"
+              >
+                Movimentações
               </Link>
+              .
+            </p>
+          ) : null}
+        </div>
+
+        <div className="bg-card rounded-xl border p-6">
+          <div className="mb-4 flex items-start justify-between">
+            <div className="bg-primary/10 rounded-lg p-2">
+              <WalletIcon className="text-primary size-5" />
+            </div>
+            <span className="text-muted-foreground px-2 py-0.5 text-xs">
+              Saldo
+            </span>
+          </div>
+          <p className="text-muted-foreground text-sm font-medium">
+            No caixa (contas)
+          </p>
+          <h3
+            className={cn(
+              "mt-1 font-heading text-2xl font-bold tabular-nums tracking-tight",
+              cashTotals.balance < 0 && "text-destructive"
+            )}
+          >
+            {formatCurrencyBRL(cashTotals.balance)}
+          </h3>
+          <p className="text-muted-foreground mt-2 text-xs leading-snug">
+            Pix, dinheiro, pagamento de fatura e demais movimentos imediatos na
+            conta. Competência geral:{" "}
+            <span
+              className={cn(
+                "font-medium tabular-nums",
+                totals.balance < 0 && "text-destructive"
+              )}
+            >
+              {formatCurrencyBRL(totals.balance)}
+            </span>
+          </p>
+          {!hasTransactions ? (
+            <p className="text-muted-foreground mt-3 border-t pt-3 text-xs leading-relaxed">
+              O saldo do caixa soma apenas lançamentos que movimentam conta
+              (ex.: Pix, dinheiro, pagamento de fatura). Cadastre-os em{" "}
+              <Link
+                to={ROUTES.movimentacoes}
+                className="text-primary font-medium underline-offset-4 hover:underline"
+              >
+                Movimentações
+              </Link>
+              .
+            </p>
+          ) : null}
+        </div>
+
+        <div className="bg-card rounded-xl border p-6">
+          <div className="mb-4 flex items-start justify-between">
+            <div className="bg-muted rounded-lg p-2">
+              <CreditCard className="text-muted-foreground size-5" />
+            </div>
+            <Button variant="link" className="h-auto p-0 text-xs" asChild>
+              <Link to={ROUTES.cartoes}>Cartões</Link>
             </Button>
           </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-            <div className="bg-card rounded-xl border p-6">
-              <div className="mb-4 flex items-start justify-between">
-                <div className="rounded-lg bg-emerald-500/15 p-2">
-                  <ArrowUpRightIcon className="size-5 text-emerald-500" />
-                </div>
-                {incomeExpenseMoM.incomePct ? (
-                  <span
-                    className={cn(
-                      "rounded px-2 py-0.5 text-xs font-medium",
-                      incomeExpenseMoM.incomePct.startsWith("-")
-                        ? "bg-destructive/10 text-destructive"
-                        : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                    )}
-                  >
-                    {incomeExpenseMoM.incomePct}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground px-2 py-0.5 text-xs">
-                    mês a mês
-                  </span>
-                )}
-              </div>
-              <p className="text-muted-foreground text-sm font-medium">
-                Total de entradas
-              </p>
-              <p className="text-muted-foreground text-xs">
-                Competência (inclui crédito não pago no caixa).
-              </p>
-              <h3 className="mt-1 font-heading text-2xl font-bold tabular-nums tracking-tight">
-                {formatCurrencyBRL(totals.totalIncome)}
-              </h3>
-            </div>
-
-            <div className="bg-card rounded-xl border p-6">
-              <div className="mb-4 flex items-start justify-between">
-                <div className="rounded-lg bg-destructive/15 p-2">
-                  <ArrowDownLeftIcon className="text-destructive size-5" />
-                </div>
-                {incomeExpenseMoM.expensePct ? (
-                  <span
-                    className={cn(
-                      "rounded px-2 py-0.5 text-xs font-medium",
-                      incomeExpenseMoM.expensePct.startsWith("-")
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                        : "bg-destructive/10 text-destructive"
-                    )}
-                  >
-                    {incomeExpenseMoM.expensePct}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground px-2 py-0.5 text-xs">
-                    mês a mês
-                  </span>
-                )}
-              </div>
-              <p className="text-muted-foreground text-sm font-medium">
-                Total de saídas
-              </p>
-              <p className="text-muted-foreground text-xs">
-                Competência (compras no crédito contam aqui).
-              </p>
-              <h3 className="mt-1 font-heading text-2xl font-bold tabular-nums tracking-tight">
-                {formatCurrencyBRL(totals.totalExpense)}
-              </h3>
-            </div>
-
-            <div className="bg-card rounded-xl border p-6">
-              <div className="mb-4 flex items-start justify-between">
-                <div className="bg-primary/10 rounded-lg p-2">
-                  <WalletIcon className="text-primary size-5" />
-                </div>
-                <span className="text-muted-foreground px-2 py-0.5 text-xs">
-                  Saldo
-                </span>
-              </div>
-              <p className="text-muted-foreground text-sm font-medium">
-                No caixa (contas)
-              </p>
-              <h3
-                className={cn(
-                  "mt-1 font-heading text-2xl font-bold tabular-nums tracking-tight",
-                  cashTotals.balance < 0 && "text-destructive"
-                )}
+          <p className="text-muted-foreground text-sm font-medium">
+            Crédito em aberto
+          </p>
+          <h3
+            className={cn(
+              "mt-1 font-heading text-2xl font-bold tabular-nums tracking-tight",
+              creditDebtTotal > 0 && "text-destructive"
+            )}
+          >
+            {formatCurrencyBRL(creditDebtTotal)}
+          </h3>
+          <p className="text-muted-foreground mt-2 text-xs">
+            Soma das faturas ainda não pagas (por ciclo de fechamento).
+          </p>
+          {!hasTransactions && creditDebtTotal === 0 ? (
+            <p className="text-muted-foreground mt-3 border-t pt-3 text-xs leading-relaxed">
+              Com compras no cartão aparece dívida conforme o fechamento. Use{" "}
+              <Link
+                to={ROUTES.movimentacoes}
+                className="text-primary font-medium underline-offset-4 hover:underline"
               >
-                {formatCurrencyBRL(cashTotals.balance)}
-              </h3>
-              <p className="text-muted-foreground mt-2 text-xs leading-snug">
-                Pix, dinheiro, pagamento de fatura e demais movimentos imediatos
-                na conta. Competência geral:{" "}
-                <span
-                  className={cn(
-                    "font-medium tabular-nums",
-                    totals.balance < 0 && "text-destructive"
-                  )}
-                >
-                  {formatCurrencyBRL(totals.balance)}
-                </span>
-              </p>
-            </div>
-
-            <div className="bg-card rounded-xl border p-6">
-              <div className="mb-4 flex items-start justify-between">
-                <div className="bg-muted rounded-lg p-2">
-                  <CreditCard className="text-muted-foreground size-5" />
-                </div>
-                <Button variant="link" className="h-auto p-0 text-xs" asChild>
-                  <Link to={ROUTES.cartoes}>Cartões</Link>
-                </Button>
-              </div>
-              <p className="text-muted-foreground text-sm font-medium">
-                Crédito em aberto
-              </p>
-              <h3
-                className={cn(
-                  "mt-1 font-heading text-2xl font-bold tabular-nums tracking-tight",
-                  creditDebtTotal > 0 && "text-destructive"
-                )}
+                Movimentações
+              </Link>{" "}
+              e cadastre{" "}
+              <Link
+                to={ROUTES.cartoes}
+                className="text-primary font-medium underline-offset-4 hover:underline"
               >
-                {formatCurrencyBRL(creditDebtTotal)}
-              </h3>
-              <p className="text-muted-foreground mt-2 text-xs">
-                Soma das faturas ainda não pagas (por ciclo de fechamento).
-              </p>
-            </div>
+                cartões
+              </Link>{" "}
+              ativos.
+            </p>
+          ) : null}
+        </div>
 
-            <div className="bg-card rounded-xl border p-6">
-              <div className="mb-4 flex items-start justify-between">
-                <div className="bg-muted rounded-lg p-2">
-                  <BarChart3Icon className="text-muted-foreground size-5" />
-                </div>
-                <span className="text-muted-foreground px-2 py-0.5 text-xs">
-                  Média
-                </span>
-              </div>
-              <p className="text-muted-foreground text-sm font-medium">
-                Saída média por mês
-              </p>
-              <h3 className="mt-1 font-heading text-2xl font-bold tabular-nums tracking-tight">
-                {formatCurrencyBRL(averageMonthlySpend)}
-              </h3>
+        <div className="bg-card rounded-xl border p-6">
+          <div className="mb-4 flex items-start justify-between">
+            <div className="bg-muted rounded-lg p-2">
+              <BarChart3Icon className="text-muted-foreground size-5" />
             </div>
+            <span className="text-muted-foreground px-2 py-0.5 text-xs">
+              Média
+            </span>
           </div>
+          <p className="text-muted-foreground text-sm font-medium">
+            Saída média por mês
+          </p>
+          <h3 className="mt-1 font-heading text-2xl font-bold tabular-nums tracking-tight">
+            {formatCurrencyBRL(averageMonthlySpend)}
+          </h3>
+          {!hasMonthlyFlow ? (
+            <p className="text-muted-foreground mt-3 border-t pt-3 text-xs leading-relaxed">
+              A média divide o total de saídas pelo número de meses que têm
+              lançamentos. Com pelo menos um mês com dados, o valor passa a
+              refletir isso.
+            </p>
+          ) : null}
+        </div>
+      </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <Card className="min-w-0 lg:col-span-2">
-              <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 space-y-0">
-                <div className="space-y-1.5">
-                  <CardTitle className="text-lg">Evolução mensal</CardTitle>
-                  <CardDescription>
-                    Entradas e saídas por mês no intervalo dos lançamentos.
-                  </CardDescription>
-                </div>
-                <div className="flex gap-4">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="size-3 shrink-0 rounded-full"
-                      style={{ background: "var(--finance-income)" }}
-                    />
-                    <span className="text-muted-foreground text-xs font-medium">
-                      Entradas
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="size-3 shrink-0 rounded-full"
-                      style={{ background: "var(--finance-expense)" }}
-                    />
-                    <span className="text-muted-foreground text-xs font-medium">
-                      Saídas
-                    </span>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="px-2 sm:px-4">
-                <ChartContainer
-                  config={flowChartConfig}
-                  className="aspect-auto h-[280px] w-full min-h-[240px]"
-                >
-                  <AreaChart
-                    accessibilityLayer
-                    data={monthlyFlow}
-                    margin={{ left: 8, right: 12, top: 8, bottom: 0 }}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Card className="min-w-0 lg:col-span-2">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 space-y-0">
+            <div className="space-y-1.5">
+              <CardTitle className="text-lg">Evolução mensal</CardTitle>
+              <CardDescription>
+                Entradas e saídas por mês no intervalo dos lançamentos.
+              </CardDescription>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <span
+                  className="size-3 shrink-0 rounded-full"
+                  style={{ background: "var(--finance-income)" }}
+                />
+                <span className="text-muted-foreground text-xs font-medium">
+                  Entradas
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className="size-3 shrink-0 rounded-full"
+                  style={{ background: "var(--finance-expense)" }}
+                />
+                <span className="text-muted-foreground text-xs font-medium">
+                  Saídas
+                </span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="relative px-2 sm:px-4">
+            {!hasMonthlyFlow ? (
+              <div
+                className="bg-muted/20 flex aspect-auto min-h-[240px] w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-6 py-8 text-center sm:min-h-[280px]"
+                role="status"
+              >
+                <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
+                  Ainda não há meses com lançamentos. Cadastre movimentações com{" "}
+                  <span className="text-foreground font-medium">
+                    data de competência
+                  </span>{" "}
+                  em{" "}
+                  <Link
+                    to={ROUTES.movimentacoes}
+                    className="text-primary font-medium underline-offset-4 hover:underline"
                   >
-                    <defs>
-                      <linearGradient
-                        id={`fillIncome-${chartGradId}`}
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="0%"
-                          stopColor="var(--color-income)"
-                          stopOpacity={0.35}
-                        />
-                        <stop
-                          offset="100%"
-                          stopColor="var(--color-income)"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                      <linearGradient
-                        id={`fillExpense-${chartGradId}`}
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="0%"
-                          stopColor="var(--color-expense)"
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="100%"
-                          stopColor="var(--color-expense)"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      interval="preserveStartEnd"
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      width={56}
-                      tickFormatter={(v) =>
-                        new Intl.NumberFormat("pt-BR", {
-                          notation: "compact",
-                          maximumFractionDigits: 1,
-                        }).format(Number(v))
-                      }
-                    />
-                    <ChartTooltip
-                      cursor={{ stroke: "var(--border)", strokeWidth: 1 }}
-                      content={
-                        <ChartTooltipContent
-                          formatter={flowTooltipFormatter}
-                        />
-                      }
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="income"
-                      stroke="var(--color-income)"
-                      strokeWidth={2}
-                      fill={`url(#fillIncome-${chartGradId})`}
-                      fillOpacity={1}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="expense"
-                      stroke="var(--color-expense)"
-                      strokeWidth={2}
-                      fill={`url(#fillExpense-${chartGradId})`}
-                      fillOpacity={1}
-                    />
-                  </AreaChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
+                    Movimentações
+                  </Link>
+                  ; o gráfico agrupa entradas e saídas por mês automaticamente.
+                </p>
+              </div>
+            ) : (
+              <ChartContainer
+                config={flowChartConfig}
+                className="aspect-auto h-[280px] w-full min-h-[240px]"
+              >
+                <AreaChart
+                  accessibilityLayer
+                  data={monthlyFlow}
+                  margin={{ left: 8, right: 12, top: 8, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient
+                      id={`fillIncome-${chartGradId}`}
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="0%"
+                        stopColor="var(--color-income)"
+                        stopOpacity={0.35}
+                      />
+                      <stop
+                        offset="100%"
+                        stopColor="var(--color-income)"
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                    <linearGradient
+                      id={`fillExpense-${chartGradId}`}
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="0%"
+                        stopColor="var(--color-expense)"
+                        stopOpacity={0.3}
+                      />
+                      <stop
+                        offset="100%"
+                        stopColor="var(--color-expense)"
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    width={56}
+                    tickFormatter={(v) =>
+                      new Intl.NumberFormat("pt-BR", {
+                        notation: "compact",
+                        maximumFractionDigits: 1,
+                      }).format(Number(v))
+                    }
+                  />
+                  <ChartTooltip
+                    cursor={{ stroke: "var(--border)", strokeWidth: 1 }}
+                    content={
+                      <ChartTooltipContent formatter={flowTooltipFormatter} />
+                    }
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="income"
+                    stroke="var(--color-income)"
+                    strokeWidth={2}
+                    fill={`url(#fillIncome-${chartGradId})`}
+                    fillOpacity={1}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="expense"
+                    stroke="var(--color-expense)"
+                    strokeWidth={2}
+                    fill={`url(#fillExpense-${chartGradId})`}
+                    fillOpacity={1}
+                  />
+                </AreaChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
 
-            <Card className="flex flex-col min-w-0">
-              <CardHeader>
-                <CardTitle className="text-lg">Top categorias</CardTitle>
-                <CardDescription>
-                  {distributionMode === "expense"
-                    ? "Maiores saídas por categoria."
-                    : "Maiores entradas por categoria."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col gap-4 pb-2 min-w-0">
-                {categorySlices.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    Sem valores para exibir.
-                  </p>
-                ) : (
+        <Card className="flex min-w-0 flex-col">
+          <CardHeader>
+            <CardTitle className="text-lg">Top categorias</CardTitle>
+            <CardDescription>
+              {distributionMode === "expense"
+                ? "Maiores saídas por categoria."
+                : "Maiores entradas por categoria."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex min-w-0 flex-1 flex-col gap-4 pb-2">
+            {categorySlices.length === 0 ? (
+              <div
+                className="bg-muted/20 flex min-h-[200px] flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center"
+                role="status"
+              >
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  {hasTransactions ? (
+                    <>
+                      Nenhuma categoria com valor neste modo (saídas ou
+                      entradas). Associe uma{" "}
+                      <span className="text-foreground font-medium">
+                        categoria
+                      </span>{" "}
+                      aos lançamentos ou crie categorias em{" "}
+                      <Link
+                        to={ROUTES.categorias}
+                        className="text-primary font-medium underline-offset-4 hover:underline"
+                      >
+                        Categorias
+                      </Link>
+                      .
+                    </>
+                  ) : (
+                    <>
+                      O gráfico usa lançamentos com categoria. Cadastre{" "}
+                      <Link
+                        to={ROUTES.categorias}
+                        className="text-primary font-medium underline-offset-4 hover:underline"
+                      >
+                        categorias
+                      </Link>{" "}
+                      e registre movimentações em{" "}
+                      <Link
+                        to={ROUTES.movimentacoes}
+                        className="text-primary font-medium underline-offset-4 hover:underline"
+                      >
+                        Movimentações
+                      </Link>{" "}
+                      escolhendo a categoria em cada uma.
+                    </>
+                  )}
+                </p>
+              </div>
+            ) : (
                   <>
                     <ChartContainer
                       config={categoryPieChartConfig}
@@ -708,8 +781,41 @@ export function DashboardPage() {
               </div>
             </div>
             {upcomingPendencies.length === 0 ? (
-              <div className="text-muted-foreground px-6 py-6 text-sm">
-                Nenhuma pendência prevista para os próximos 7 dias.
+              <div
+                className="text-muted-foreground px-6 py-8 text-center text-sm leading-relaxed sm:px-8 sm:text-left"
+                role="status"
+              >
+                Nada previsto nesta janela. Esta lista reúne vencimentos de
+                fatura, parcelas, recorrências e lançamentos futuros com data
+                nos próximos 7 dias. Cadastre-os em{" "}
+                <Link
+                  to={ROUTES.movimentacoes}
+                  className="text-primary font-medium underline-offset-4 hover:underline"
+                >
+                  Movimentações
+                </Link>
+                ,{" "}
+                <Link
+                  to={ROUTES.recorrencias}
+                  className="text-primary font-medium underline-offset-4 hover:underline"
+                >
+                  Recorrências
+                </Link>{" "}
+                ou{" "}
+                <Link
+                  to={ROUTES.parcelamentos}
+                  className="text-primary font-medium underline-offset-4 hover:underline"
+                >
+                  Parcelamentos
+                </Link>
+                , ou aguarde o ciclo do cartão em{" "}
+                <Link
+                  to={ROUTES.cartoes}
+                  className="text-primary font-medium underline-offset-4 hover:underline"
+                >
+                  Cartões
+                </Link>
+                .
               </div>
             ) : (
               <Table>
@@ -814,48 +920,66 @@ export function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tableRows.map((row) => (
-                  <TableRow key={row.period}>
-                    <TableCell className="px-6 py-4 font-medium">
-                      {row.label}
-                    </TableCell>
-                    <TableCell className="text-emerald-600 dark:text-emerald-400 px-6 py-4 tabular-nums">
-                      {formatCurrencyBRL(row.income)}
-                    </TableCell>
-                    <TableCell className="text-destructive px-6 py-4 tabular-nums">
-                      {formatCurrencyBRL(row.expense)}
-                    </TableCell>
+                {tableRows.length === 0 ? (
+                  <TableRow className="hover:bg-transparent">
                     <TableCell
-                      className={cn(
-                        "px-6 py-4 font-semibold tabular-nums",
-                        row.balance < 0 && "text-destructive"
-                      )}
+                      colSpan={5}
+                      className="text-muted-foreground px-6 py-8 text-center text-sm leading-relaxed"
                     >
-                      {formatCurrencyBRL(row.balance)}
-                    </TableCell>
-                    <TableCell className="px-6 py-4 text-right text-sm tabular-nums">
-                      {row.balanceMoMPct === null ? (
-                        <span className="text-muted-foreground">—</span>
-                      ) : (
-                        <span
-                          className={
-                            row.balanceMoMPct >= 0
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : "text-destructive"
-                          }
-                        >
-                          {row.balanceMoMPct >= 0 ? "+" : ""}
-                          {row.balanceMoMPct.toFixed(1)}%
-                        </span>
-                      )}
+                      Sem linhas ainda: o resumo lista os últimos 12 meses que
+                      têm lançamentos. Registre movimentações com data de
+                      competência em{" "}
+                      <Link
+                        to={ROUTES.movimentacoes}
+                        className="text-primary font-medium underline-offset-4 hover:underline"
+                      >
+                        Movimentações
+                      </Link>
+                      .
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  tableRows.map((row) => (
+                    <TableRow key={row.period}>
+                      <TableCell className="px-6 py-4 font-medium">
+                        {row.label}
+                      </TableCell>
+                      <TableCell className="text-emerald-600 dark:text-emerald-400 px-6 py-4 tabular-nums">
+                        {formatCurrencyBRL(row.income)}
+                      </TableCell>
+                      <TableCell className="text-destructive px-6 py-4 tabular-nums">
+                        {formatCurrencyBRL(row.expense)}
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          "px-6 py-4 font-semibold tabular-nums",
+                          row.balance < 0 && "text-destructive"
+                        )}
+                      >
+                        {formatCurrencyBRL(row.balance)}
+                      </TableCell>
+                      <TableCell className="px-6 py-4 text-right text-sm tabular-nums">
+                        {row.balanceMoMPct === null ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <span
+                            className={
+                              row.balanceMoMPct >= 0
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : "text-destructive"
+                            }
+                          >
+                            {row.balanceMoMPct >= 0 ? "+" : ""}
+                            {row.balanceMoMPct.toFixed(1)}%
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
-        </>
-      )}
     </div>
   )
 }

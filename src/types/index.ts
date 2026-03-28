@@ -26,6 +26,7 @@ export type {
   UpdateRecurringRuleInput,
 } from "./recurring"
 export type {
+  CreateAccountTransferInput,
   CreateTransactionInput,
   PaymentMethod,
   Transaction,

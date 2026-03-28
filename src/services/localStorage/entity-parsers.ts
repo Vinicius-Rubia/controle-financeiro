@@ -4,6 +4,7 @@ import type { Card } from "@/types/card"
 import type {
   CreateInstallmentPlanInput,
   Installment,
+  InstallmentPaymentMethod,
   InstallmentPlan,
 } from "@/types/installment"
 import type {
@@ -162,7 +163,8 @@ function parsePaymentMethod(raw: Record<string, unknown>): PaymentMethod | null 
     v === "credit_card" ||
     v === "boleto" ||
     v === "cash" ||
-    v === "credit_card_settlement"
+    v === "credit_card_settlement" ||
+    v === "account_transfer"
   ) {
     return v
   }
@@ -171,9 +173,11 @@ function parsePaymentMethod(raw: Record<string, unknown>): PaymentMethod | null 
 
 function parseInstallmentPaymentMethod(
   raw: Record<string, unknown>
-): Exclude<PaymentMethod, "credit_card_settlement"> | null {
+): InstallmentPaymentMethod | null {
   const pm = parsePaymentMethod(raw)
-  if (!pm || pm === "credit_card_settlement") return null
+  if (!pm || pm === "credit_card_settlement" || pm === "account_transfer") {
+    return null
+  }
   return pm
 }
 
@@ -211,11 +215,18 @@ export function parseTransaction(raw: unknown): Transaction | null {
   const paymentMethod = parsePaymentMethod(o)
   if (!paymentMethod) return null
   const categoryId = optionalTrimmedString(o.categoryId)
-  if (paymentMethod !== "credit_card_settlement" && !categoryId) return null
+  if (
+    paymentMethod !== "credit_card_settlement" &&
+    paymentMethod !== "account_transfer" &&
+    !categoryId
+  ) {
+    return null
+  }
   const accountId = optionalTrimmedString(o.accountId)
   if (!accountId) return null
   const cardId = optionalTrimmedString(o.cardId)
   const statementPeriodKey = optionalTrimmedString(o.statementPeriodKey)
+  const transferGroupId = optionalTrimmedString(o.transferGroupId)
 
   return {
     id: o.id.trim(),
@@ -227,6 +238,7 @@ export function parseTransaction(raw: unknown): Transaction | null {
     accountId,
     cardId,
     statementPeriodKey,
+    transferGroupId,
     date: o.date.trim(),
     description,
     createdAt,
@@ -478,12 +490,14 @@ export function assertCreateTransactionInput(
     o.paymentMethod !== "credit_card" &&
     o.paymentMethod !== "boleto" &&
     o.paymentMethod !== "cash" &&
-    o.paymentMethod !== "credit_card_settlement"
+    o.paymentMethod !== "credit_card_settlement" &&
+    o.paymentMethod !== "account_transfer"
   ) {
     return false
   }
   if (
     o.paymentMethod !== "credit_card_settlement" &&
+    o.paymentMethod !== "account_transfer" &&
     !isNonEmptyString(o.categoryId)
   ) {
     return false
@@ -497,6 +511,12 @@ export function assertCreateTransactionInput(
   } else if (
     o.statementPeriodKey !== undefined &&
     !isNonEmptyString(o.statementPeriodKey)
+  ) {
+    return false
+  }
+  if (
+    o.transferGroupId !== undefined &&
+    !isNonEmptyString(o.transferGroupId)
   ) {
     return false
   }

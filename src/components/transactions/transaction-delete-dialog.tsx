@@ -47,6 +47,12 @@ export function TransactionDeleteDialog({
                   </>
                 ) : null}
               </p>
+              {transaction?.transferGroupId ? (
+                <p>
+                  O lançamento pareado da mesma transferência (entrada ou saída
+                  na outra conta) também será excluído.
+                </p>
+              ) : null}
               <p>Esta ação não pode ser desfeita.</p>
             </div>
           </AlertDialogDescription>

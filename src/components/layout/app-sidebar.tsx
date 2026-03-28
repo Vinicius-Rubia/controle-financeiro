@@ -4,6 +4,7 @@ import { Link, NavLink, useMatch } from "react-router-dom"
 import {
   ArrowDownUp,
   CreditCard,
+  Database,
   HandCoins,
   Landmark,
   LayoutDashboard,
@@ -33,6 +34,7 @@ const NAV = [
   { to: ROUTES.parcelamentos, label: "Parcelamentos", icon: HandCoins },
   { to: ROUTES.recorrencias, label: "Recorrências", icon: Repeat },
   { to: ROUTES.movimentacoes, label: "Entradas/Saídas", icon: ArrowDownUp },
+  { to: ROUTES.dados, label: "Dados locais", icon: Database },
 ] as const
 
 function SidebarNavItem({

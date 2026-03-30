@@ -1439,6 +1439,50 @@ export type PayInstallmentOptions = {
   transactionDateIso?: string
 }
 
+function closingIsoForInstallmentDue(
+  installmentDueIso: string,
+  card: Pick<Card, "closingDay" | "dueDay">
+): string {
+  const due = parseISODateParts(installmentDueIso)
+  let closingYear = due.year
+  let closingMonth1 = due.month
+  // Mesmo critério de dueDateForStatementClosing: quando dueDay <= closingDay,
+  // o vencimento é no mês seguinte ao fechamento.
+  if (card.dueDay <= card.closingDay) {
+    if (closingMonth1 === 1) {
+      closingMonth1 = 12
+      closingYear -= 1
+    } else {
+      closingMonth1 -= 1
+    }
+  }
+  const closeDom = Math.min(card.closingDay, daysInMonth(closingYear, closingMonth1))
+  return `${closingYear}-${pad2(closingMonth1)}-${pad2(closeDom)}`
+}
+
+function cycleStartIsoForClosing(
+  closingIso: string,
+  card: Pick<Card, "closingDay">
+): string {
+  const closing = parseISODateParts(closingIso)
+  let prevYear = closing.year
+  let prevMonth1 = closing.month
+  if (prevMonth1 === 1) {
+    prevMonth1 = 12
+    prevYear -= 1
+  } else {
+    prevMonth1 -= 1
+  }
+  const prevCloseDom = Math.min(card.closingDay, daysInMonth(prevYear, prevMonth1))
+  const start = new Date(prevYear, prevMonth1 - 1, prevCloseDom)
+  start.setDate(start.getDate() + 1)
+  return localISODateYearMonthDay(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate()
+  )
+}
+
 function installmentReservedForAutoPost(
   plan: InstallmentPlan,
   inst: Installment,
@@ -1449,17 +1493,10 @@ function installmentReservedForAutoPost(
   if (plan.paymentMethod !== "credit_card" || !card) {
     return inst.dueDate <= todayISO
   }
-
-  const dueDom = parseISODateParts(inst.dueDate).day
-  const ymDue = inst.dueDate.slice(0, 7)
-  const ymToday = todayISO.slice(0, 7)
-
-  if (dueDom < card.closingDay && ymDue === ymToday) {
-    if (inst.dueDate <= todayISO) return true
-    return todayISO < inst.dueDate
-  }
-
-  return inst.dueDate <= todayISO
+  const targetClosingIso = closingIsoForInstallmentDue(inst.dueDate, card)
+  const cycleStartIso = cycleStartIsoForClosing(targetClosingIso, card)
+  // Só lança quando o ciclo correto da parcela já abriu.
+  return todayISO >= cycleStartIso
 }
 
 function installmentAutoPostLedgerDate(
@@ -1471,16 +1508,13 @@ function installmentAutoPostLedgerDate(
   if (plan.paymentMethod !== "credit_card" || !card) {
     return inst.dueDate
   }
-
-  const dueDom = parseISODateParts(inst.dueDate).day
-  const ymDue = inst.dueDate.slice(0, 7)
-  const ymToday = todayISO.slice(0, 7)
-
-  if (dueDom < card.closingDay && ymDue === ymToday && todayISO < inst.dueDate) {
+  const targetClosingIso = closingIsoForInstallmentDue(inst.dueDate, card)
+  // Enquanto o ciclo está aberto, usa "hoje"; após fechamento, retroage para o
+  // fechamento do ciclo para preservar a fatura correta.
+  if (todayISO <= targetClosingIso) {
     return todayISO
   }
-
-  return inst.dueDate
+  return targetClosingIso
 }
 
 export function payInstallment(
@@ -1562,9 +1596,10 @@ export function payInstallment(
 }
 
 /**
- * Parcelamentos com autoPost: no crédito, parcelas com vencimento antes do fechamento
- * no mês corrente podem lançar na fatura aberta antes do vencimento; demais seguem
- * `dueDate <= hoje`. No débito/caixa, só quando `dueDate <= hoje`.
+ * Parcelamentos com autoPost:
+ * - Crédito: cada parcela lança quando o ciclo correto abre e com data ajustada para
+ *   garantir entrada na fatura esperada (comportamento equivalente a compras no cartão).
+ * - Débito/caixa: lança somente em `dueDate <= hoje`.
  */
 export function sweepAutoPostInstallmentPlans(): void {
   migrateCategoriesFromLegacyOnce()

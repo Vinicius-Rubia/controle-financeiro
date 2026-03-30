@@ -722,9 +722,9 @@ export function InstallmentPlanFormDialog({
                 )}
               />
               <FieldDescription className="text-xs">
-                No crédito, parcelas com vencimento antes do fechamento no mês podem entrar
-                na fatura aberta ao abrir o app; vencimento após o fechamento segue a data
-                da parcela. No débito/caixa, o lançamento desconta na data da parcela.
+                No crédito, cada parcela entra no ciclo correto da fatura (mesma regra
+                das compras no cartão). No débito/caixa, o lançamento desconta na data da
+                parcela.
               </FieldDescription>
               <FieldError errors={[form.formState.errors.autoPost]} />
             </Field>

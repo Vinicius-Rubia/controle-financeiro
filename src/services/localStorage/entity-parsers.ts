@@ -1,5 +1,9 @@
 import type { Account, AccountKind } from "@/types/account"
 import type { Category, CategoryType } from "@/types/category"
+import {
+  isValidWalletAccentHex,
+  normalizeWalletAccentHex,
+} from "@/lib/card-wallet-accent"
 import type { Card } from "@/types/card"
 import type {
   CreateInstallmentPlanInput,
@@ -20,6 +24,35 @@ function isNonEmptyString(v: unknown): v is string {
 
 function isFiniteNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v)
+}
+
+/** Backup JSON ou cópias podem trazer dia como string. */
+function coerceDayOfMonth(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) {
+    const n = Math.trunc(v)
+    if (n >= 1 && n <= 31) return n
+    return null
+  }
+  if (typeof v === "string" && v.trim()) {
+    const n = Math.trunc(Number(v.trim()))
+    if (Number.isFinite(n) && n >= 1 && n <= 31) return n
+  }
+  return null
+}
+
+function coerceNonNegativeNumber(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v) && v >= 0) return v
+  if (typeof v === "string" && v.trim()) {
+    const n = Number(v.trim().replace(",", "."))
+    if (Number.isFinite(n) && n >= 0) return n
+  }
+  return null
+}
+
+function coerceCardActive(v: unknown): boolean | null {
+  if (v === true || v === "true" || v === 1 || v === "1") return true
+  if (v === false || v === "false" || v === 0 || v === "0") return false
+  return null
 }
 
 function optionalTrimmedString(v: unknown): string | undefined {
@@ -73,14 +106,16 @@ export function parseCard(raw: unknown): Card | null {
   if (!isNonEmptyString(o.id)) return null
   if (!isNonEmptyString(o.name)) return null
   if (!isNonEmptyString(o.accountId)) return null
-  if (typeof o.active !== "boolean") return null
 
-  if (!isFiniteNumber(o.closingDay)) return null
-  if (!isFiniteNumber(o.dueDay)) return null
-  if (o.closingDay < 1 || o.closingDay > 31) return null
-  if (o.dueDay < 1 || o.dueDay > 31) return null
+  const active = coerceCardActive(o.active)
+  if (active === null) return null
 
-  if (!isFiniteNumber(o.limit) || o.limit < 0) return null
+  const closingDay = coerceDayOfMonth(o.closingDay)
+  const dueDay = coerceDayOfMonth(o.dueDay)
+  if (closingDay === null || dueDay === null) return null
+
+  const limit = coerceNonNegativeNumber(o.limit)
+  if (limit === null) return null
 
   const createdAt = isNonEmptyString(o.createdAt) ? o.createdAt.trim() : null
   if (!createdAt) return null
@@ -90,15 +125,22 @@ export function parseCard(raw: unknown): Card | null {
 
   const logoDataUrl = typeof o.logoDataUrl === "string" ? o.logoDataUrl : ""
 
+  const walletRaw =
+    typeof o.walletAccentHex === "string" ? o.walletAccentHex.trim() : ""
+  const walletAccentHex = normalizeWalletAccentHex(
+    walletRaw.startsWith("#") ? walletRaw : walletRaw ? `#${walletRaw}` : ""
+  )
+
   return {
     id: o.id.trim(),
     name: o.name.trim(),
     logoDataUrl,
     accountId: o.accountId.trim(),
-    active: o.active,
-    closingDay: o.closingDay,
-    dueDay: o.dueDay,
-    limit: o.limit,
+    active,
+    closingDay,
+    dueDay,
+    limit,
+    walletAccentHex,
     createdAt,
     updatedAt,
   }
@@ -136,12 +178,19 @@ export function parseAccount(raw: unknown): Account | null {
 
   const logoDataUrl = typeof o.logoDataUrl === "string" ? o.logoDataUrl : ""
 
+  const walletRaw =
+    typeof o.walletAccentHex === "string" ? o.walletAccentHex.trim() : ""
+  const walletAccentHex = normalizeWalletAccentHex(
+    walletRaw.startsWith("#") ? walletRaw : walletRaw ? `#${walletRaw}` : ""
+  )
+
   return {
     id: o.id.trim(),
     name: o.name.trim(),
     kind,
     active: o.active,
     logoDataUrl,
+    walletAccentHex,
     createdAt,
     updatedAt,
   }
@@ -397,6 +446,9 @@ export function parseInstallmentPlan(raw: unknown): InstallmentPlan | null {
   const cardId = optionalTrimmedString(o.cardId)
   const description = typeof o.description === "string" ? o.description : ""
   const logoDataUrl = typeof o.logoDataUrl === "string" ? o.logoDataUrl : ""
+  const walletAccentHex = normalizeWalletAccentHex(
+    typeof o.walletAccentHex === "string" ? o.walletAccentHex : ""
+  )
   if (o.status !== "active" && o.status !== "completed" && o.status !== "cancelled") {
     return null
   }
@@ -426,10 +478,13 @@ export function parseInstallmentPlan(raw: unknown): InstallmentPlan | null {
           .filter((i) => i.status === "posted")
           .reduce((sum, i) => sum + i.amount, 0)
 
+  const autoPost = typeof o.autoPost === "boolean" ? o.autoPost : false
+
   return {
     id: o.id.trim(),
     title: o.title.trim(),
     logoDataUrl,
+    walletAccentHex,
     totalAmount: o.totalAmount,
     installmentCount: o.installmentCount,
     type,
@@ -438,6 +493,7 @@ export function parseInstallmentPlan(raw: unknown): InstallmentPlan | null {
     accountId,
     cardId,
     description,
+    autoPost,
     status: o.status,
     reservedAmount,
     postedAmount,
@@ -473,6 +529,8 @@ export function assertCreateCardInput(
   if (!isFiniteNumber(o.dueDay) || o.dueDay < 1 || o.dueDay > 31) return false
   if (!isFiniteNumber(o.limit) || o.limit < 0) return false
   if (typeof o.logoDataUrl !== "string") return false
+  if (typeof o.walletAccentHex !== "string") return false
+  if (!isValidWalletAccentHex(o.walletAccentHex)) return false
   return true
 }
 
@@ -541,6 +599,8 @@ export function assertCreateAccountInput(
   }
   if (typeof o.active !== "boolean") return false
   if (typeof o.logoDataUrl !== "string") return false
+  if (typeof o.walletAccentHex !== "string") return false
+  if (!isValidWalletAccentHex(o.walletAccentHex)) return false
   return true
 }
 
@@ -609,5 +669,8 @@ export function assertCreateInstallmentPlanInput(
   if (!isNonEmptyString(o.accountId)) return false
   if (o.cardId !== undefined && !isNonEmptyString(o.cardId)) return false
   if (typeof o.description !== "string") return false
+  if (typeof o.walletAccentHex !== "string") return false
+  if (!isValidWalletAccentHex(o.walletAccentHex)) return false
+  if (o.autoPost !== undefined && typeof o.autoPost !== "boolean") return false
   return true
 }

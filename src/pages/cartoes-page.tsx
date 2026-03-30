@@ -5,9 +5,8 @@ import { toast } from "sonner"
 
 import { CardDeleteDialog } from "@/components/cards/card-delete-dialog"
 import { CardFormDialog } from "@/components/cards/card-form-dialog"
-import { CardListCards } from "@/components/cards/card-list-cards"
-import { CardListTable } from "@/components/cards/card-list-table"
 import { CardStatementSheet } from "@/components/cards/card-statement-sheet"
+import { CardWalletView } from "@/components/cards/card-wallet-view"
 import { Button } from "@/components/ui/button"
 import { ROUTES } from "@/constants/routes"
 import {
@@ -20,13 +19,15 @@ import {
 } from "@/components/ui/empty"
 import { useAccounts } from "@/hooks/use-accounts"
 import { useCards } from "@/hooks/use-cards"
+import { useCategories } from "@/hooks/use-categories"
 import { useInstallmentPlans } from "@/hooks/use-installment-plans"
 import { useTransactions } from "@/hooks/use-transactions"
 import type { Card } from "@/types/card"
 
 export function CartoesPage() {
   const { accounts } = useAccounts()
-  const { cards, create, update, remove } = useCards()
+  const { categories } = useCategories()
+  const { cards, create, update, remove, getById } = useCards()
   const { transactions } = useTransactions()
   const { plans } = useInstallmentPlans()
 
@@ -49,13 +50,11 @@ export function CartoesPage() {
     return m
   }, [accounts])
 
-  const accountLogoById = useMemo(() => {
+  const categoryNameById = useMemo(() => {
     const m = new Map<string, string>()
-    for (const a of accounts) {
-      if (a.logoDataUrl) m.set(a.id, a.logoDataUrl)
-    }
+    for (const c of categories) m.set(c.id, c.name)
     return m
-  }, [accounts])
+  }, [categories])
 
   const openCreate = () => {
     setCardToEdit(null)
@@ -63,7 +62,7 @@ export function CartoesPage() {
   }
 
   const openEdit = (card: Card) => {
-    setCardToEdit(card)
+    setCardToEdit(getById(card.id) ?? card)
     setFormOpen(true)
   }
 
@@ -78,7 +77,6 @@ export function CartoesPage() {
 
   const hasAccounts = accounts.length > 0
   const hasCards = cards.length > 0
-  const activeCount = cards.filter((c) => c.active).length
 
   return (
     <div className="flex flex-col gap-8">
@@ -148,7 +146,8 @@ export function CartoesPage() {
                 Cartões
               </h1>
               <p className="text-muted-foreground mt-1 text-sm">
-                Gerencie cartões ativos/inativos e dados de ciclo da fatura.
+                Visualize como na carteira do banco: toque no cartão para abrir a
+                fatura e ver cada lançamento.
               </p>
             </div>
             <Button type="button" size="lg" className="font-semibold" onClick={openCreate}>
@@ -157,41 +156,15 @@ export function CartoesPage() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="bg-card rounded-xl border p-6">
-              <p className="text-muted-foreground text-sm">Total</p>
-              <h3 className="font-heading text-2xl font-bold">{cards.length}</h3>
-            </div>
-            <div className="bg-card rounded-xl border p-6">
-              <p className="text-muted-foreground text-sm">Ativos</p>
-              <h3 className="font-heading text-2xl font-bold">{activeCount}</h3>
-            </div>
-          </div>
-
-          <div className="hidden md:block">
-            <CardListTable
-              cards={sortedCards}
-              transactions={transactions}
-              installmentPlans={plans}
-              accountNameById={accountNameById}
-              accountLogoById={accountLogoById}
-              onEdit={openEdit}
-              onDelete={setDeleteTarget}
-              onOpenStatements={setStatementCard}
-            />
-          </div>
-          <div className="md:hidden">
-            <CardListCards
-              cards={sortedCards}
-              transactions={transactions}
-              installmentPlans={plans}
-              accountNameById={accountNameById}
-              accountLogoById={accountLogoById}
-              onEdit={openEdit}
-              onDelete={setDeleteTarget}
-              onOpenStatements={setStatementCard}
-            />
-          </div>
+          <CardWalletView
+            cards={sortedCards}
+            transactions={transactions}
+            installmentPlans={plans}
+            accountNameById={accountNameById}
+            onOpenStatement={setStatementCard}
+            onEdit={openEdit}
+            onDelete={setDeleteTarget}
+          />
         </>
       )}
 
@@ -225,6 +198,7 @@ export function CartoesPage() {
         card={statementCard}
         transactions={transactions}
         installmentPlans={plans}
+        categoryNameById={categoryNameById}
       />
     </div>
   )

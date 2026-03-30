@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { PencilIcon, PlusIcon, UploadIcon, XIcon } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -35,6 +35,12 @@ import {
   maskCurrencyInputBR,
   parseCurrencyInputBR,
 } from "@/lib/currency-input"
+import {
+  CARD_WALLET_ACCENT_PRESETS,
+  isValidWalletAccentHex,
+  normalizeWalletAccentHex,
+} from "@/lib/card-wallet-accent"
+import { cn } from "@/lib/utils"
 import type { Account } from "@/types/account"
 import type { Card, CreateCardInput, UpdateCardInput } from "@/types/card"
 
@@ -53,6 +59,10 @@ const cardFormSchema = z.object({
       const parsed = parseCurrencyInputBR(s)
       return parsed !== null
     }, "Limite inválido."),
+  walletAccentHex: z
+    .string()
+    .trim()
+    .refine((s) => isValidWalletAccentHex(s), "Cor inválida."),
 })
 
 type CardFormValues = z.input<typeof cardFormSchema>
@@ -77,6 +87,7 @@ function defaultValues(card: Card | null): CardFormValues {
       closingDay: 1,
       dueDay: 10,
       limit: "0,00",
+      walletAccentHex: "",
     }
   }
   return {
@@ -87,6 +98,7 @@ function defaultValues(card: Card | null): CardFormValues {
     closingDay: card.closingDay,
     dueDay: card.dueDay,
     limit: formatCurrencyInputBRFromNumber(card.limit),
+    walletAccentHex: normalizeWalletAccentHex(card.walletAccentHex ?? ""),
   }
 }
 
@@ -112,14 +124,17 @@ export function CardFormDialog({
 
   const form = useForm<CardFormValues, unknown, CardFormSubmitValues>({
     resolver: zodResolver(cardFormSchema),
-    defaultValues: defaultValues(cardToEdit),
+    defaultValues: defaultValues(null),
   })
 
+  useEffect(() => {
+    if (!open) return
+    form.reset(defaultValues(cardToEdit))
+    setUploadingLogo(false)
+  }, [open, cardToEdit, form])
+
   const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen) {
-      form.reset(defaultValues(cardToEdit))
-      setUploadingLogo(false)
-    }
+    if (!nextOpen) setUploadingLogo(false)
     onOpenChange(nextOpen)
   }
 
@@ -143,6 +158,7 @@ export function CardFormDialog({
       closingDay: values.closingDay,
       dueDay: values.dueDay,
       limit: parseCurrencyInputBR(values.limit) ?? 0,
+      walletAccentHex: normalizeWalletAccentHex(values.walletAccentHex),
     }
 
     try {
@@ -234,6 +250,83 @@ export function CardFormDialog({
                 Exibida na lista ao lado do nome do cartão. A conta da fatura usa a
                 logo cadastrada na própria conta.
               </FieldDescription>
+            </Field>
+
+            <Field
+              data-invalid={
+                form.formState.errors.walletAccentHex ? true : undefined
+              }
+            >
+              <FieldLabel>Cor na carteira</FieldLabel>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={
+                      form.watch("walletAccentHex") === "" ? "secondary" : "outline"
+                    }
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() =>
+                      form.setValue("walletAccentHex", "", { shouldDirty: true })
+                    }
+                  >
+                    Automático
+                  </Button>
+                  {CARD_WALLET_ACCENT_PRESETS.map((p) => {
+                    const active = form.watch("walletAccentHex") === p.hex
+                    return (
+                      <button
+                        key={p.hex}
+                        type="button"
+                        title={p.label}
+                        className={cn(
+                          "size-9 shrink-0 rounded-full border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          active
+                            ? "border-foreground scale-105"
+                            : "border-transparent ring-1 ring-foreground/15"
+                        )}
+                        style={{ backgroundColor: p.hex }}
+                        onClick={() =>
+                          form.setValue("walletAccentHex", p.hex, {
+                            shouldDirty: true,
+                          })
+                        }
+                      />
+                    )
+                  })}
+                  <Controller
+                    control={form.control}
+                    name="walletAccentHex"
+                    render={({ field }) => (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          id="card-wallet-accent"
+                          className="border-input h-9 w-14 cursor-pointer overflow-hidden rounded-md border bg-background p-0"
+                          value={
+                            field.value && field.value.length === 7
+                              ? field.value
+                              : "#64748b"
+                          }
+                          onChange={(e) =>
+                            field.onChange(e.target.value.toLowerCase())
+                          }
+                          aria-label="Escolher cor personalizada"
+                        />
+                        <FieldDescription className="text-xs">
+                          Personalizada
+                        </FieldDescription>
+                      </div>
+                    )}
+                  />
+                </div>
+                <FieldDescription className="text-xs">
+                  Automático usa um gradiente conforme o cartão. Ou escolha um
+                  preset / cor para o fundo na visualização em Cartões.
+                </FieldDescription>
+              </div>
+              <FieldError errors={[form.formState.errors.walletAccentHex]} />
             </Field>
 
             <Field data-invalid={form.formState.errors.accountId ? true : undefined}>

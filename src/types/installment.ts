@@ -25,6 +25,11 @@ export interface InstallmentPlan {
   title: string
   /** Imagem opcional (data URL), ex.: logo da loja ou fornecedor. */
   logoDataUrl: string
+  /**
+   * Cor principal do gradiente na carteira de parcelamentos (`#rrggbb`).
+   * String vazia = gradiente automático pelo id do plano.
+   */
+  walletAccentHex: string
   totalAmount: number
   installmentCount: number
   type: TransactionType
@@ -33,6 +38,11 @@ export interface InstallmentPlan {
   accountId: string
   cardId?: string
   description: string
+  /**
+   * Quando verdadeiro, parcelas reservadas são lançadas automaticamente no
+   * vencimento (ou depois), ao abrir o app — equivalente ao autoPost das recorrências.
+   */
+  autoPost: boolean
   status: InstallmentPlanStatus
   /** Valor ainda reservado no limite do cartão (não lançado na fatura). */
   reservedAmount: number

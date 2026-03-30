@@ -53,6 +53,18 @@ export function currentOpenStatementClosingIso(
 }
 
 /**
+ * Data do 1º vencimento para um parcelamento novo no crédito, conforme o ciclo
+ * do cartão na data da compra (fechamento / vencimento).
+ */
+export function firstInstallmentDueDateForCreditPurchase(
+  todayIso: string,
+  card: Pick<Card, "closingDay" | "dueDay">
+): string {
+  const closingIso = currentOpenStatementClosingIso(todayIso, card.closingDay)
+  return dueDateForStatementClosing(closingIso, card.dueDay)
+}
+
+/**
  * Data de vencimento estimada para o ciclo com fechamento em `closingIso`.
  * Regra:
  * - se `dueDay` for após o dia de fechamento, vence no mesmo mês;
@@ -203,4 +215,79 @@ export function statementSummariesForCard(
       }
     }
   )
+}
+
+/** Inclui a fatura “aberta” atual mesmo sem lançamentos ainda. */
+export function allStatementClosingDatesForCard(
+  transactions: Transaction[],
+  card: Card,
+  todayIso: string
+): string[] {
+  const fromTx = listStatementClosingDatesForCard(transactions, card)
+  const current = currentOpenStatementClosingIso(todayIso, card.closingDay)
+  const keys = new Set(fromTx)
+  keys.add(current)
+  return [...keys].sort((a, b) => a.localeCompare(b))
+}
+
+export function statementSummaryForClosing(
+  transactions: Transaction[],
+  card: Card,
+  closingDateIso: string
+): StatementSummaryRow {
+  const net = creditCycleNetAmount(
+    transactions,
+    card.id,
+    card.closingDay,
+    closingDateIso
+  )
+  const paid = settlementsTotalForCycle(
+    transactions,
+    card.id,
+    closingDateIso
+  )
+  return {
+    closingDateIso,
+    netPurchases: net,
+    paid,
+    outstanding: Math.max(0, net - paid),
+    dueDateIso: dueDateForStatementClosing(closingDateIso, card.dueDay),
+  }
+}
+
+/** Compras no crédito do ciclo, mais recentes primeiro. */
+export function creditPurchasesInCycle(
+  transactions: Transaction[],
+  cardId: string,
+  closingDay: number,
+  closingDateIso: string
+): Transaction[] {
+  const list = transactions.filter((t) => {
+    if (t.cardId !== cardId || t.paymentMethod !== "credit_card") return false
+    return statementPeriodKeyForPurchase(t.date, closingDay) === closingDateIso
+  })
+  list.sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1
+    return b.createdAt.localeCompare(a.createdAt)
+  })
+  return list
+}
+
+/** Pagamentos de fatura vinculados ao ciclo. */
+export function settlementTransactionsInCycle(
+  transactions: Transaction[],
+  cardId: string,
+  closingDateIso: string
+): Transaction[] {
+  const list = transactions.filter(
+    (t) =>
+      t.cardId === cardId &&
+      t.paymentMethod === "credit_card_settlement" &&
+      t.statementPeriodKey?.trim() === closingDateIso
+  )
+  list.sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1
+    return b.createdAt.localeCompare(a.createdAt)
+  })
+  return list
 }

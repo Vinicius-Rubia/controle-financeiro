@@ -12,6 +12,11 @@ export interface Account {
   active: boolean
   /** Imagem opcional (data URL), ex.: logo do banco. */
   logoDataUrl: string
+  /**
+   * Cor principal do gradiente na visualização da carteira (`#rrggbb`).
+   * String vazia = gradiente automático pelo id da conta.
+   */
+  walletAccentHex: string
   createdAt: string
   updatedAt: string
 }

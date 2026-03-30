@@ -32,6 +32,12 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { accountKindLabel } from "@/lib/account-ui"
+import {
+  CARD_WALLET_ACCENT_PRESETS,
+  isValidWalletAccentHex,
+  normalizeWalletAccentHex,
+} from "@/lib/card-wallet-accent"
+import { cn } from "@/lib/utils"
 import type {
   Account,
   AccountKind,
@@ -50,6 +56,10 @@ const accountFormSchema = z.object({
   ]),
   active: z.boolean(),
   logoDataUrl: z.string(),
+  walletAccentHex: z
+    .string()
+    .trim()
+    .refine((s) => isValidWalletAccentHex(s), "Cor inválida."),
 })
 
 type AccountFormValues = z.infer<typeof accountFormSchema>
@@ -61,6 +71,7 @@ function defaultValues(account: Account | null): AccountFormValues {
       kind: "checking",
       active: true,
       logoDataUrl: "",
+      walletAccentHex: "",
     }
   }
   return {
@@ -68,6 +79,7 @@ function defaultValues(account: Account | null): AccountFormValues {
     kind: account.kind,
     active: account.active,
     logoDataUrl: account.logoDataUrl,
+    walletAccentHex: normalizeWalletAccentHex(account.walletAccentHex ?? ""),
   }
 }
 
@@ -126,6 +138,7 @@ export function AccountFormDialog({
       kind: values.kind,
       active: values.active,
       logoDataUrl: values.logoDataUrl,
+      walletAccentHex: normalizeWalletAccentHex(values.walletAccentHex),
     }
 
     try {
@@ -153,7 +166,7 @@ export function AccountFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" showCloseButton>
+      <DialogContent className="sm:max-w-lg" showCloseButton>
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Editar conta" : "Nova conta"}
@@ -294,6 +307,83 @@ export function AccountFormDialog({
                 A logo aparece na lista de contas e nos cartões que usam esta conta
                 para pagar a fatura.
               </FieldDescription>
+            </Field>
+
+            <Field
+              data-invalid={
+                form.formState.errors.walletAccentHex ? true : undefined
+              }
+            >
+              <FieldLabel>Cor na carteira</FieldLabel>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={
+                      form.watch("walletAccentHex") === "" ? "secondary" : "outline"
+                    }
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() =>
+                      form.setValue("walletAccentHex", "", { shouldDirty: true })
+                    }
+                  >
+                    Automático
+                  </Button>
+                  {CARD_WALLET_ACCENT_PRESETS.map((p) => {
+                    const active = form.watch("walletAccentHex") === p.hex
+                    return (
+                      <button
+                        key={p.hex}
+                        type="button"
+                        title={p.label}
+                        className={cn(
+                          "size-9 shrink-0 rounded-full border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          active
+                            ? "border-foreground scale-105"
+                            : "border-transparent ring-1 ring-foreground/15"
+                        )}
+                        style={{ backgroundColor: p.hex }}
+                        onClick={() =>
+                          form.setValue("walletAccentHex", p.hex, {
+                            shouldDirty: true,
+                          })
+                        }
+                      />
+                    )
+                  })}
+                  <Controller
+                    control={form.control}
+                    name="walletAccentHex"
+                    render={({ field }) => (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          id="acc-wallet-accent"
+                          className="border-input h-9 w-14 cursor-pointer overflow-hidden rounded-md border bg-background p-0"
+                          value={
+                            field.value && field.value.length === 7
+                              ? field.value
+                              : "#64748b"
+                          }
+                          onChange={(e) =>
+                            field.onChange(e.target.value.toLowerCase())
+                          }
+                          aria-label="Escolher cor personalizada"
+                        />
+                        <FieldDescription className="text-xs">
+                          Personalizada
+                        </FieldDescription>
+                      </div>
+                    )}
+                  />
+                </div>
+                <FieldDescription className="text-xs">
+                  Automático usa um gradiente conforme a conta. Ou escolha um
+                  preset / cor para o fundo na visualização em Contas.
+                </FieldDescription>
+              </div>
+              <FieldError errors={[form.formState.errors.walletAccentHex]} />
             </Field>
           </FieldGroup>
 

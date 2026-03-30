@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { format } from "date-fns"
 import { CalendarIcon, PencilIcon, PlusIcon, UploadIcon, XIcon } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Controller, useForm, useWatch } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -37,9 +37,17 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Spinner } from "@/components/ui/spinner"
 import { firstActiveAccountId } from "@/lib/account-ui"
 import { cardSupportsPaymentMethod } from "@/lib/card-ui"
+import {
+  CARD_WALLET_ACCENT_PRESETS,
+  isValidWalletAccentHex,
+  normalizeWalletAccentHex,
+} from "@/lib/card-wallet-accent"
+import { firstInstallmentDueDateForCreditPurchase } from "@/lib/credit-statement"
+import { cn } from "@/lib/utils"
 import {
   formatCurrencyInputBRFromNumber,
   maskCurrencyInputBR,
@@ -76,6 +84,11 @@ const formSchema = z.object({
   accountId: z.string().trim().min(1, "Selecione a conta."),
   cardId: z.string().optional(),
   description: z.string(),
+  walletAccentHex: z
+    .string()
+    .trim()
+    .refine((s) => isValidWalletAccentHex(s), "Cor inválida."),
+  autoPost: z.boolean(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -118,6 +131,8 @@ function defaultValues(
       accountId: firstActiveAccountId(accounts),
       cardId: "",
       description: "",
+      walletAccentHex: "",
+      autoPost: false,
     }
   }
   return {
@@ -132,6 +147,8 @@ function defaultValues(
     accountId: plan.accountId,
     cardId: plan.cardId ?? "",
     description: plan.description,
+    walletAccentHex: normalizeWalletAccentHex(plan.walletAccentHex ?? ""),
+    autoPost: plan.autoPost,
   }
 }
 
@@ -165,6 +182,7 @@ export function InstallmentPlanFormDialog({
   const txType = useWatch({ control: form.control, name: "type" }) ?? "expense"
   const paymentMethod =
     useWatch({ control: form.control, name: "paymentMethod" }) ?? "pix"
+  const cardIdWatched = useWatch({ control: form.control, name: "cardId" }) ?? ""
   const needsCard = paymentMethod === "credit_card"
 
   const compatibleCategories = useMemo(
@@ -182,12 +200,43 @@ export function InstallmentPlanFormDialog({
       ),
     [cards, paymentMethod]
   )
+  const selectedCardForDue = useMemo(
+    () => compatibleCards.find((c) => c.id === cardIdWatched.trim()),
+    [compatibleCards, cardIdWatched]
+  )
+
+  const firstDueDateLocked = isEdit || needsCard
+  const prevPaymentMethodRef = useRef<string>("pix")
 
   useEffect(() => {
-    if (open) {
-      form.reset(defaultValues(planToEdit, categories, accounts))
-    }
+    if (!open) return
+    const d = defaultValues(planToEdit, categories, accounts)
+    form.reset(d)
+    prevPaymentMethodRef.current = d.paymentMethod
   }, [open, planToEdit, categories, accounts, form])
+
+  useEffect(() => {
+    if (!open || isEdit) return
+    const prev = prevPaymentMethodRef.current
+    if (prev === "credit_card" && paymentMethod !== "credit_card") {
+      form.setValue("firstDueDate", todayISODate(), { shouldValidate: true })
+    }
+    prevPaymentMethodRef.current = paymentMethod
+  }, [open, isEdit, paymentMethod, form])
+
+  useEffect(() => {
+    if (!open || isEdit) return
+    if (paymentMethod !== "credit_card") return
+    if (!selectedCardForDue) {
+      form.setValue("firstDueDate", todayISODate(), { shouldValidate: true })
+      return
+    }
+    form.setValue(
+      "firstDueDate",
+      firstInstallmentDueDateForCreditPurchase(todayISODate(), selectedCardForDue),
+      { shouldValidate: true }
+    )
+  }, [open, isEdit, paymentMethod, selectedCardForDue, form])
 
   useEffect(() => {
     const current = form.getValues("categoryId")
@@ -227,11 +276,25 @@ export function InstallmentPlanFormDialog({
     }
 
     try {
+      let firstDueDateStr = values.firstDueDate.trim()
+      if (!planToEdit && values.paymentMethod === "credit_card") {
+        const card = cards.find((c) => c.id === values.cardId?.trim())
+        if (!card) {
+          toast.error("Selecione um cartão de crédito.")
+          return
+        }
+        firstDueDateStr = firstInstallmentDueDateForCreditPurchase(
+          todayISODate(),
+          card
+        )
+      }
+
       if (planToEdit) {
         const next = onUpdate({
           id: planToEdit.id,
           title: values.title.trim(),
           logoDataUrl: values.logoDataUrl,
+          walletAccentHex: normalizeWalletAccentHex(values.walletAccentHex),
           totalAmount,
           type: values.type,
           categoryId: values.categoryId.trim(),
@@ -239,6 +302,7 @@ export function InstallmentPlanFormDialog({
           accountId: values.accountId.trim(),
           cardId: values.cardId?.trim() || undefined,
           description: values.description.trim(),
+          autoPost: values.autoPost,
         })
         if (!next) {
           toast.error("Não foi possível atualizar o parcelamento.")
@@ -249,15 +313,17 @@ export function InstallmentPlanFormDialog({
         onCreate({
           title: values.title.trim(),
           logoDataUrl: values.logoDataUrl,
+          walletAccentHex: normalizeWalletAccentHex(values.walletAccentHex),
           totalAmount,
           installmentCount: Math.floor(installmentCount),
-          firstDueDate: values.firstDueDate.trim(),
+          firstDueDate: firstDueDateStr,
           type: values.type,
           categoryId: values.categoryId.trim(),
           paymentMethod: values.paymentMethod,
           accountId: values.accountId.trim(),
           cardId: values.cardId?.trim() || undefined,
           description: values.description.trim(),
+          autoPost: values.autoPost,
         })
         toast.success("Parcelamento criado.")
       }
@@ -269,8 +335,13 @@ export function InstallmentPlanFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton className="sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent
+        showCloseButton
+        className={cn(
+          "flex max-h-[90dvh] w-full max-w-[calc(100vw-1.25rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+        )}
+      >
+        <DialogHeader className="shrink-0 space-y-1.5 px-4 pt-4 pr-12 text-left sm:px-6">
           <DialogTitle>{isEdit ? "Editar parcelamento" : "Novo parcelamento"}</DialogTitle>
           <DialogDescription>
             {isEdit
@@ -279,8 +350,12 @@ export function InstallmentPlanFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={onSubmit} className="space-y-4">
-          <FieldGroup className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <form
+          onSubmit={onSubmit}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 sm:px-6">
+            <FieldGroup className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field className="sm:col-span-2">
               <FieldLabel htmlFor="title">Título</FieldLabel>
               <Input id="title" {...form.register("title")} />
@@ -340,6 +415,84 @@ export function InstallmentPlanFormDialog({
               </FieldDescription>
             </Field>
 
+            <Field
+              className="sm:col-span-2"
+              data-invalid={
+                form.formState.errors.walletAccentHex ? true : undefined
+              }
+            >
+              <FieldLabel>Cor na carteira</FieldLabel>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={
+                      form.watch("walletAccentHex") === "" ? "secondary" : "outline"
+                    }
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() =>
+                      form.setValue("walletAccentHex", "", { shouldDirty: true })
+                    }
+                  >
+                    Automático
+                  </Button>
+                  {CARD_WALLET_ACCENT_PRESETS.map((p) => {
+                    const active = form.watch("walletAccentHex") === p.hex
+                    return (
+                      <button
+                        key={p.hex}
+                        type="button"
+                        title={p.label}
+                        className={cn(
+                          "size-9 shrink-0 rounded-full border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          active
+                            ? "border-foreground scale-105"
+                            : "border-transparent ring-1 ring-foreground/15"
+                        )}
+                        style={{ backgroundColor: p.hex }}
+                        onClick={() =>
+                          form.setValue("walletAccentHex", p.hex, {
+                            shouldDirty: true,
+                          })
+                        }
+                      />
+                    )
+                  })}
+                  <Controller
+                    control={form.control}
+                    name="walletAccentHex"
+                    render={({ field }) => (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          id="installment-wallet-accent"
+                          className="border-input h-9 w-14 cursor-pointer overflow-hidden rounded-md border bg-background p-0"
+                          value={
+                            field.value && field.value.length === 7
+                              ? field.value
+                              : "#64748b"
+                          }
+                          onChange={(e) =>
+                            field.onChange(e.target.value.toLowerCase())
+                          }
+                          aria-label="Escolher cor personalizada"
+                        />
+                        <FieldDescription className="text-xs">
+                          Personalizada
+                        </FieldDescription>
+                      </div>
+                    )}
+                  />
+                </div>
+                <FieldDescription className="text-xs">
+                  Automático usa um gradiente conforme o plano. Ou escolha um tom
+                  para o fundo na lista em formato carteira.
+                </FieldDescription>
+              </div>
+              <FieldError errors={[form.formState.errors.walletAccentHex]} />
+            </Field>
+
             <Field>
               <FieldLabel htmlFor="totalAmount">Valor total</FieldLabel>
               <Controller
@@ -367,52 +520,6 @@ export function InstallmentPlanFormDialog({
                 {...form.register("installmentCount")}
               />
               <FieldError errors={[form.formState.errors.installmentCount]} />
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="firstDueDate">Primeiro vencimento</FieldLabel>
-              <Controller
-                control={form.control}
-                name="firstDueDate"
-                render={({ field }) => (
-                  <Popover
-                    open={firstDueDatePickerOpen && !isEdit}
-                    onOpenChange={(nextOpen) => {
-                      if (isEdit) return
-                      setFirstDueDatePickerOpen(nextOpen)
-                    }}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        id="firstDueDate"
-                        type="button"
-                        variant="outline"
-                        className="w-full justify-start gap-2"
-                        disabled={isEdit}
-                      >
-                        <CalendarIcon data-icon="inline-start" />
-                        {field.value
-                          ? isoDateToLocalDate(field.value).toLocaleDateString("pt-BR")
-                          : "Selecione"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value ? isoDateToLocalDate(field.value) : undefined}
-                        onSelect={(date) => {
-                          if (!date) return
-                          field.onChange(format(date, "yyyy-MM-dd"))
-                          setFirstDueDatePickerOpen(false)
-                        }}
-                        weekStartsOn={1}
-                        showOutsideDays
-                      />
-                    </PopoverContent>
-                  </Popover>
-                )}
-              />
-              <FieldError errors={[form.formState.errors.firstDueDate]} />
             </Field>
 
             <Field>
@@ -526,13 +633,110 @@ export function InstallmentPlanFormDialog({
               </Field>
             ) : null}
 
+            <Field
+              data-invalid={
+                form.formState.errors.firstDueDate ? true : undefined
+              }
+            >
+              <FieldLabel htmlFor="firstDueDate">Primeiro vencimento</FieldLabel>
+              <Controller
+                control={form.control}
+                name="firstDueDate"
+                render={({ field }) => (
+                  <Popover
+                    open={firstDueDatePickerOpen && !firstDueDateLocked}
+                    onOpenChange={(nextOpen) => {
+                      if (firstDueDateLocked) return
+                      setFirstDueDatePickerOpen(nextOpen)
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="firstDueDate"
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-start gap-2"
+                        disabled={firstDueDateLocked}
+                      >
+                        <CalendarIcon data-icon="inline-start" />
+                        {field.value
+                          ? isoDateToLocalDate(field.value).toLocaleDateString("pt-BR")
+                          : needsCard && !selectedCardForDue
+                            ? "Selecione o cartão"
+                            : "Selecione"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value ? isoDateToLocalDate(field.value) : undefined}
+                        onSelect={(date) => {
+                          if (!date) return
+                          field.onChange(format(date, "yyyy-MM-dd"))
+                          setFirstDueDatePickerOpen(false)
+                        }}
+                        weekStartsOn={1}
+                        showOutsideDays
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+              />
+              {needsCard ? (
+                <FieldDescription className="text-xs">
+                  Definido pelo ciclo do cartão: fechamento dia{" "}
+                  {selectedCardForDue?.closingDay ?? "—"}, vencimento dia{" "}
+                  {selectedCardForDue?.dueDay ?? "—"}.
+                </FieldDescription>
+              ) : (
+                <FieldDescription className="text-xs">
+                  Pix, débito, boleto e dinheiro: você escolhe a data; o valor sai do caixa
+                  na data do lançamento.
+                </FieldDescription>
+              )}
+              <FieldError errors={[form.formState.errors.firstDueDate]} />
+            </Field>
+
+            <Field
+              className="sm:col-span-2"
+              data-invalid={form.formState.errors.autoPost ? true : undefined}
+            >
+              <FieldLabel>Lançamento automático</FieldLabel>
+              <Controller
+                name="autoPost"
+                control={form.control}
+                render={({ field }) => (
+                  <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    className="w-full max-w-md justify-stretch *:flex-1 sm:max-w-sm"
+                    value={field.value ? "on" : "off"}
+                    onValueChange={(v) => {
+                      if (v === "on") field.onChange(true)
+                      if (v === "off") field.onChange(false)
+                    }}
+                  >
+                    <ToggleGroupItem value="on">Sim</ToggleGroupItem>
+                    <ToggleGroupItem value="off">Não</ToggleGroupItem>
+                  </ToggleGroup>
+                )}
+              />
+              <FieldDescription className="text-xs">
+                No crédito, parcelas com vencimento antes do fechamento no mês podem entrar
+                na fatura aberta ao abrir o app; vencimento após o fechamento segue a data
+                da parcela. No débito/caixa, o lançamento desconta na data da parcela.
+              </FieldDescription>
+              <FieldError errors={[form.formState.errors.autoPost]} />
+            </Field>
+
             <Field className="sm:col-span-2">
               <FieldLabel htmlFor="description">Descrição</FieldLabel>
               <Textarea id="description" rows={3} {...form.register("description")} />
             </Field>
           </FieldGroup>
+          </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="bg-background/98 supports-backdrop-filter:backdrop-blur-xs shrink-0 gap-2 border-t px-4 py-3 sm:px-6 sm:justify-end">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>

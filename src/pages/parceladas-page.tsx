@@ -7,7 +7,7 @@ import { InstallmentPayDialog } from "@/components/installments/installment-pay-
 import { InstallmentPlanCancelDialog } from "@/components/installments/installment-plan-cancel-dialog"
 import { InstallmentPlanDeleteDialog } from "@/components/installments/installment-plan-delete-dialog"
 import { InstallmentPlanFormDialog } from "@/components/installments/installment-plan-form-dialog"
-import { InstallmentPlanListTable } from "@/components/installments/installment-plan-list-table"
+import { InstallmentPlansWalletView } from "@/components/installments/installment-plans-wallet-view"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,6 +19,8 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { ROUTES } from "@/constants/routes"
+import { formatCurrencyBRL } from "@/lib/format-currency"
+import { cn } from "@/lib/utils"
 import { useAccounts } from "@/hooks/use-accounts"
 import { useCards } from "@/hooks/use-cards"
 import { useCategories } from "@/hooks/use-categories"
@@ -62,13 +64,30 @@ export function ParceladasPage() {
   const hasCategories = categories.length > 0
   const hasAccounts = accounts.length > 0
 
-  const sortedPlans = useMemo(
-    () =>
-      [...plans].sort((a, b) =>
-        a.title.localeCompare(b.title, "pt-BR", { sensitivity: "base" })
-      ),
-    [plans]
-  )
+  const sortedPlans = useMemo(() => {
+    const statusOrder = { active: 0, completed: 1, cancelled: 2 } as const
+    return [...plans].sort((a, b) => {
+      const d = statusOrder[a.status] - statusOrder[b.status]
+      if (d !== 0) return d
+      return a.title.localeCompare(b.title, "pt-BR", { sensitivity: "base" })
+    })
+  }, [plans])
+
+  const installmentSummary = useMemo(() => {
+    let totalReserved = 0
+    let activeCount = 0
+    let nextDue: string | null = null
+    for (const p of sortedPlans) {
+      if (p.status !== "active") continue
+      activeCount += 1
+      totalReserved += p.reservedAmount
+      for (const i of p.installments) {
+        if (i.status !== "reserved") continue
+        if (nextDue === null || i.dueDate < nextDue) nextDue = i.dueDate
+      }
+    }
+    return { totalReserved, activeCount, nextDue }
+  }, [sortedPlans])
 
   const openCreate = () => {
     setPlanToEdit(null)
@@ -125,11 +144,11 @@ export function ParceladasPage() {
       <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-            Contas parceladas
+            Parcelamentos
           </h1>
           <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Gerencie compras parceladas, acompanhe valores em aberto e registre
-            cada parcela conforme o meio de pagamento.
+            Visualize como no app do banco: deslize entre os planos, acompanhe o
+            que falta pagar e registre cada parcela no cartão ou na conta.
           </p>
         </div>
         <Button
@@ -199,23 +218,73 @@ export function ParceladasPage() {
       ) : null}
 
       {hasCategories && hasAccounts && sortedPlans.length > 0 ? (
-        <div className="bg-card overflow-hidden rounded-xl border">
-          <div className="bg-muted/30 border-b px-6 py-4">
-            <h4 className="font-heading font-bold">Lista de parcelamentos</h4>
+        <div className="flex flex-col gap-6">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="sm:col-span-2 rounded-2xl border border-border bg-card p-6 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                Pendente em planos ativos
+              </p>
+              <p
+                className={cn(
+                  "font-heading mt-1 text-3xl font-bold tabular-nums tracking-tight",
+                  installmentSummary.totalReserved === 0 && "text-muted-foreground"
+                )}
+              >
+                {formatCurrencyBRL(installmentSummary.totalReserved)}
+              </p>
+              <p className="text-muted-foreground mt-3 text-xs">
+                Soma do valor ainda em aberto ou reservado no limite, apenas
+                parcelamentos com status ativo.
+              </p>
+            </div>
+            <div className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-muted/20 p-5 shadow-sm ring-1 ring-black/5 dark:bg-muted/15 dark:ring-white/10">
+              <div>
+                <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                  Próximo vencimento
+                </p>
+                <p className="font-heading mt-2 text-xl font-bold tabular-nums tracking-tight">
+                  {installmentSummary.nextDue
+                    ? new Date(
+                        `${installmentSummary.nextDue}T00:00:00`
+                      ).toLocaleDateString("pt-BR")
+                    : "—"}
+                </p>
+              </div>
+              <div className="border-t border-border/80 pt-4">
+                <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                  Planos ativos
+                </p>
+                <p className="font-heading mt-1 text-2xl font-bold tabular-nums">
+                  {installmentSummary.activeCount}
+                </p>
+              </div>
+            </div>
           </div>
-          <InstallmentPlanListTable
-            plans={sortedPlans}
-            categoryNameById={categoryNameById}
-            accountNameById={accountNameById}
-            cardNameById={cardNameById}
-            onEdit={(plan) => {
-              setPlanToEdit(plan)
-              setFormOpen(true)
-            }}
-            onCancel={setCancelTarget}
-            onDelete={setDeleteTarget}
-            onPay={(plan, installment) => setPayTarget({ plan, installment })}
-          />
+
+          <div>
+            <h2 className="font-heading text-lg font-bold tracking-tight">
+              Seus parcelamentos
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Cada cartão mostra progresso e o valor pendente; as parcelas
+              aparecem abaixo do plano selecionado.
+            </p>
+            <div className="mt-5">
+              <InstallmentPlansWalletView
+                plans={sortedPlans}
+                categoryNameById={categoryNameById}
+                accountNameById={accountNameById}
+                cardNameById={cardNameById}
+                onEdit={(plan) => {
+                  setPlanToEdit(plan)
+                  setFormOpen(true)
+                }}
+                onCancel={setCancelTarget}
+                onDelete={setDeleteTarget}
+                onPay={(plan, installment) => setPayTarget({ plan, installment })}
+              />
+            </div>
+          </div>
         </div>
       ) : null}
 

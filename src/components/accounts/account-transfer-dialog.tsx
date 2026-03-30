@@ -76,12 +76,10 @@ function isoDateToLocalDate(iso: string): Date {
   return new Date(year, month - 1, day)
 }
 
-function defaultValues(accounts: Account[]): FormValues {
-  const a0 = accounts[0]?.id ?? ""
-  const a1 = accounts[1]?.id ?? a0
+function defaultValues(): FormValues {
   return {
-    fromAccountId: a0,
-    toAccountId: accounts.length > 1 ? a1 : "",
+    fromAccountId: "",
+    toAccountId: "",
     amount: "",
     date: todayISODate(),
     description: "",
@@ -114,37 +112,18 @@ export function AccountTransferDialog({
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: defaultValues(sorted),
+    defaultValues: defaultValues(),
   })
 
   useEffect(() => {
     if (open) {
-      form.reset(defaultValues(sorted))
+      form.reset(defaultValues())
     }
   }, [open, sorted, form])
 
   const fromAccountId = useWatch({ control: form.control, name: "fromAccountId" })
-  const toAccountId = useWatch({ control: form.control, name: "toAccountId" })
   const txDate = useWatch({ control: form.control, name: "date" })
   const amountStr = useWatch({ control: form.control, name: "amount" })
-
-  const accountsForFrom = useMemo(
-    () => sorted.filter((a) => a.id !== toAccountId),
-    [sorted, toAccountId]
-  )
-  const accountsForTo = useMemo(
-    () => sorted.filter((a) => a.id !== fromAccountId),
-    [sorted, fromAccountId]
-  )
-
-  useEffect(() => {
-    if (!open || sorted.length < 2) return
-    if (fromAccountId && toAccountId && fromAccountId === toAccountId) {
-      const fallback =
-        sorted.find((a) => a.id !== fromAccountId)?.id ?? ""
-      form.setValue("toAccountId", fallback, { shouldValidate: true })
-    }
-  }, [open, sorted, fromAccountId, toAccountId, form])
 
   const todayStr = todayISODate()
 
@@ -238,26 +217,18 @@ export function AccountTransferDialog({
                   control={form.control}
                   render={({ field }) => (
                     <Select
-                      value={field.value}
-                      onValueChange={(v) => {
-                        field.onChange(v)
-                        if (v === toAccountId) {
-                          const next = sorted.find((a) => a.id !== v)?.id ?? ""
-                          form.setValue("toAccountId", next, {
-                            shouldValidate: true,
-                          })
-                        }
-                      }}
+                      value={field.value || undefined}
+                      onValueChange={field.onChange}
                       disabled={!canSubmit || form.formState.isSubmitting}
                     >
                       <SelectTrigger
                         aria-invalid={!!form.formState.errors.fromAccountId}
                         className="w-full"
                       >
-                        <SelectValue placeholder="Selecione" />
+                        <SelectValue placeholder="Conta de origem" />
                       </SelectTrigger>
                       <SelectContent>
-                        {accountsForFrom.map((a) => (
+                        {sorted.map((a) => (
                           <SelectItem key={a.id} value={a.id}>
                             {a.name}
                           </SelectItem>
@@ -280,26 +251,18 @@ export function AccountTransferDialog({
                   control={form.control}
                   render={({ field }) => (
                     <Select
-                      value={field.value}
-                      onValueChange={(v) => {
-                        field.onChange(v)
-                        if (v === fromAccountId) {
-                          const next = sorted.find((a) => a.id !== v)?.id ?? ""
-                          form.setValue("fromAccountId", next, {
-                            shouldValidate: true,
-                          })
-                        }
-                      }}
+                      value={field.value || undefined}
+                      onValueChange={field.onChange}
                       disabled={!canSubmit || form.formState.isSubmitting}
                     >
                       <SelectTrigger
                         aria-invalid={!!form.formState.errors.toAccountId}
                         className="w-full"
                       >
-                        <SelectValue placeholder="Selecione" />
+                        <SelectValue placeholder="Conta de destino" />
                       </SelectTrigger>
                       <SelectContent>
-                        {accountsForTo.map((a) => (
+                        {sorted.map((a) => (
                           <SelectItem key={a.id} value={a.id}>
                             {a.name}
                           </SelectItem>

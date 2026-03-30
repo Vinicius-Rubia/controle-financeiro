@@ -1,13 +1,13 @@
 import { LandmarkIcon, PlusIcon } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import { AccountDeleteDialog } from "@/components/accounts/account-delete-dialog"
+import { AccountDetailSheet } from "@/components/accounts/account-detail-sheet"
 import { AccountFormDialog } from "@/components/accounts/account-form-dialog"
 import { AccountTransferDialog } from "@/components/accounts/account-transfer-dialog"
 import { AccountTransferToolbarButton } from "@/components/accounts/account-transfer-toolbar-button"
-import { AccountListCards } from "@/components/accounts/account-list-cards"
-import { AccountListTable } from "@/components/accounts/account-list-table"
+import { AccountWalletView } from "@/components/accounts/account-wallet-view"
 import { Button } from "@/components/ui/button"
 import {
   Empty,
@@ -17,18 +17,24 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
+import { accountNetBalance } from "@/lib/account-ui"
+import { formatCurrencyBRL } from "@/lib/format-currency"
+import { cn } from "@/lib/utils"
 import { useAccounts } from "@/hooks/use-accounts"
+import { useCategories } from "@/hooks/use-categories"
 import { useTransactions } from "@/hooks/use-transactions"
 import type { Account } from "@/types/account"
 
 export function ContasPage() {
   const { accounts, create, update, remove } = useAccounts()
+  const { categories } = useCategories()
   const { transactions, transferBetweenAccounts } = useTransactions()
 
   const [formOpen, setFormOpen] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
   const [accountToEdit, setAccountToEdit] = useState<Account | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null)
+  const [detailAccountId, setDetailAccountId] = useState<string | null>(null)
 
   const sortedAccounts = useMemo(
     () =>
@@ -42,6 +48,31 @@ export function ContasPage() {
     () => sortedAccounts.filter((a) => a.active && a.kind === "checking"),
     [sortedAccounts]
   )
+
+  const totalCashBalance = useMemo(() => {
+    let sum = 0
+    for (const a of sortedAccounts) {
+      sum += accountNetBalance(transactions, a.id)
+    }
+    return sum
+  }, [sortedAccounts, transactions])
+
+  const categoryNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const c of categories) m.set(c.id, c.name)
+    return m
+  }, [categories])
+
+  const detailAccount = useMemo(() => {
+    if (!detailAccountId) return null
+    return accounts.find((a) => a.id === detailAccountId) ?? null
+  }, [accounts, detailAccountId])
+
+  useEffect(() => {
+    if (detailAccountId && !accounts.some((a) => a.id === detailAccountId)) {
+      setDetailAccountId(null)
+    }
+  }, [accounts, detailAccountId])
 
   const openCreate = () => {
     setAccountToEdit(null)
@@ -67,7 +98,6 @@ export function ContasPage() {
   }
 
   const hasAccounts = accounts.length > 0
-  const activeCount = accounts.filter((a) => a.active).length
 
   return (
     <div className="flex flex-col gap-8">
@@ -109,8 +139,9 @@ export function ContasPage() {
                 Contas
               </h1>
               <p className="text-muted-foreground mt-1 text-sm">
-                Contas mostram o saldo em caixa (Pix, espécie, pagamento de
-                fatura). Dívida de cartão fica na fatura até liquidar.
+                Visualize como no app do banco: deslize entre as contas, toque
+                para ver o extrato no caixa e use o menu para editar ou excluir.
+                Transferências entre contas correntes ficam no botão ao lado.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -130,33 +161,33 @@ export function ContasPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="bg-card rounded-xl border p-6">
-              <p className="text-muted-foreground text-sm">Total</p>
-              <h3 className="font-heading text-2xl font-bold">{accounts.length}</h3>
-            </div>
-            <div className="bg-card rounded-xl border p-6">
-              <p className="text-muted-foreground text-sm">Ativas</p>
-              <h3 className="font-heading text-2xl font-bold">{activeCount}</h3>
-            </div>
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+              Saldo total em contas
+            </p>
+            <p
+              className={cn(
+                "font-heading mt-1 text-3xl font-bold tabular-nums tracking-tight",
+                totalCashBalance < 0 && "text-destructive",
+                totalCashBalance > 0 && "text-emerald-600 dark:text-emerald-400",
+                totalCashBalance === 0 && "text-muted-foreground"
+              )}
+            >
+              {formatCurrencyBRL(totalCashBalance)}
+            </p>
+            <p className="text-muted-foreground mt-3 text-xs">
+              Soma do saldo no caixa de todas as contas listadas (imediato). Não
+              inclui limite de cartão.
+            </p>
           </div>
 
-          <div className="hidden md:block">
-            <AccountListTable
-              accounts={sortedAccounts}
-              transactions={transactions}
-              onEdit={openEdit}
-              onDelete={setDeleteTarget}
-            />
-          </div>
-          <div className="md:hidden">
-            <AccountListCards
-              accounts={sortedAccounts}
-              transactions={transactions}
-              onEdit={openEdit}
-              onDelete={setDeleteTarget}
-            />
-          </div>
+          <AccountWalletView
+            accounts={sortedAccounts}
+            transactions={transactions}
+            onOpenAccount={(a) => setDetailAccountId(a.id)}
+            onEdit={openEdit}
+            onDelete={setDeleteTarget}
+          />
         </>
       )}
 
@@ -187,6 +218,20 @@ export function ContasPage() {
         checkingAccounts={checkingAccounts}
         transactions={transactions}
         onTransfer={transferBetweenAccounts}
+      />
+
+      <AccountDetailSheet
+        open={detailAccount !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailAccountId(null)
+        }}
+        account={detailAccount}
+        transactions={transactions}
+        categoryNameById={categoryNameById}
+        onEditAccount={(a) => {
+          setAccountToEdit(a)
+          setFormOpen(true)
+        }}
       />
     </div>
   )

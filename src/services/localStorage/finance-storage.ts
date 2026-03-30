@@ -15,6 +15,7 @@ import type {
   InstallmentPlan,
   UpdateInstallmentPlanInput,
 } from "@/types/installment"
+import { normalizeWalletAccentHex } from "@/lib/card-wallet-accent"
 import type { Card, CreateCardInput, UpdateCardInput } from "@/types/card"
 import type {
   CreateRecurringRuleInput,
@@ -316,6 +317,11 @@ function localISODateYearMonthDay(y: number, monthIndex: number, day: number): s
   return `${y}-${pad2(monthIndex + 1)}-${pad2(day)}`
 }
 
+function localTodayISODate(): string {
+  const n = new Date()
+  return localISODateYearMonthDay(n.getFullYear(), n.getMonth(), n.getDate())
+}
+
 const ISO_RX = /^(\d{4})-(\d{2})-(\d{2})$/
 
 function parseISODateParts(iso: string): { year: number; month: number; day: number } {
@@ -543,6 +549,7 @@ export function createCard(input: CreateCardInput): Card {
     closingDay: input.closingDay,
     dueDay: input.dueDay,
     limit: input.limit,
+    walletAccentHex: normalizeWalletAccentHex(input.walletAccentHex),
     createdAt: now,
     updatedAt: now,
   }))
@@ -569,6 +576,10 @@ export function updateCard(input: UpdateCardInput): Card | null {
     assertCardLinkedAccount(nextAccountId)
   } catch {
     return null
+  }
+
+  if (patch.walletAccentHex !== undefined) {
+    patch.walletAccentHex = normalizeWalletAccentHex(patch.walletAccentHex)
   }
 
   return cardsRepo.update(id, {
@@ -602,6 +613,7 @@ export function createAccount(input: CreateAccountInput): Account {
     kind: input.kind,
     active: input.active,
     logoDataUrl: input.logoDataUrl,
+    walletAccentHex: normalizeWalletAccentHex(input.walletAccentHex),
     createdAt: now,
     updatedAt: now,
   }))
@@ -610,6 +622,9 @@ export function createAccount(input: CreateAccountInput): Account {
 export function updateAccount(input: UpdateAccountInput): Account | null {
   const { id, ...rest } = input
   const patch = omitUndefined(rest) as Partial<Omit<Account, "id">>
+  if (patch.walletAccentHex !== undefined) {
+    patch.walletAccentHex = normalizeWalletAccentHex(patch.walletAccentHex)
+  }
   return accountsRepo.update(id, {
     ...patch,
     updatedAt: new Date().toISOString(),
@@ -1266,6 +1281,7 @@ export function createInstallmentPlan(
   }
 
   const now = new Date().toISOString()
+  const autoPost = input.autoPost ?? false
   const installments: Installment[] = amounts.map((amount, index) => ({
     id: crypto.randomUUID(),
     number: index + 1,
@@ -1281,6 +1297,7 @@ export function createInstallmentPlan(
     id: crypto.randomUUID(),
     title: input.title.trim(),
     logoDataUrl: input.logoDataUrl,
+    walletAccentHex: normalizeWalletAccentHex(input.walletAccentHex),
     totalAmount: input.totalAmount,
     installmentCount: normalizedCount,
     type: input.type,
@@ -1289,6 +1306,7 @@ export function createInstallmentPlan(
     accountId: accountId as string,
     cardId: normalizedCardId,
     description: input.description,
+    autoPost,
     status: "active",
     reservedAmount: buckets.reservedAmount,
     postedAmount: buckets.postedAmount,
@@ -1310,6 +1328,10 @@ export function updateInstallmentPlan(
 
   if (!merged.title.trim()) return null
   if (typeof merged.logoDataUrl !== "string") return null
+  merged.walletAccentHex = normalizeWalletAccentHex(
+    typeof merged.walletAccentHex === "string" ? merged.walletAccentHex : ""
+  )
+  if (typeof merged.autoPost !== "boolean") return null
   if (!Number.isFinite(merged.totalAmount) || merged.totalAmount <= 0) return null
   if (!Number.isFinite(merged.installmentCount) || merged.installmentCount < 1) {
     return null
@@ -1389,6 +1411,7 @@ export function updateInstallmentPlan(
   return installmentPlansRepo.update(id, {
     title: merged.title.trim(),
     logoDataUrl: merged.logoDataUrl,
+    walletAccentHex: normalizeWalletAccentHex(merged.walletAccentHex),
     totalAmount: merged.totalAmount,
     installments: nextInstallments,
     type: merged.type,
@@ -1397,6 +1420,7 @@ export function updateInstallmentPlan(
     accountId: merged.accountId,
     cardId: merged.cardId?.trim() || undefined,
     description: merged.description,
+    autoPost: merged.autoPost,
     reservedAmount: nextBuckets.reservedAmount,
     postedAmount: nextBuckets.postedAmount,
     updatedAt: new Date().toISOString(),
@@ -1410,11 +1434,61 @@ export function deleteInstallmentPlan(id: string): boolean {
   return installmentPlansRepo.remove(id)
 }
 
+export type PayInstallmentOptions = {
+  /** Data do movimento no extrato / conta (padrão: `paymentDateISO`). */
+  transactionDateIso?: string
+}
+
+function installmentReservedForAutoPost(
+  plan: InstallmentPlan,
+  inst: Installment,
+  todayISO: string,
+  card: Card | undefined
+): boolean {
+  if (inst.status !== "reserved") return false
+  if (plan.paymentMethod !== "credit_card" || !card) {
+    return inst.dueDate <= todayISO
+  }
+
+  const dueDom = parseISODateParts(inst.dueDate).day
+  const ymDue = inst.dueDate.slice(0, 7)
+  const ymToday = todayISO.slice(0, 7)
+
+  if (dueDom < card.closingDay && ymDue === ymToday) {
+    if (inst.dueDate <= todayISO) return true
+    return todayISO < inst.dueDate
+  }
+
+  return inst.dueDate <= todayISO
+}
+
+function installmentAutoPostLedgerDate(
+  plan: InstallmentPlan,
+  inst: Installment,
+  todayISO: string,
+  card: Card | undefined
+): string {
+  if (plan.paymentMethod !== "credit_card" || !card) {
+    return inst.dueDate
+  }
+
+  const dueDom = parseISODateParts(inst.dueDate).day
+  const ymDue = inst.dueDate.slice(0, 7)
+  const ymToday = todayISO.slice(0, 7)
+
+  if (dueDom < card.closingDay && ymDue === ymToday && todayISO < inst.dueDate) {
+    return todayISO
+  }
+
+  return inst.dueDate
+}
+
 export function payInstallment(
   planId: string,
   installmentId: string,
   paymentDateISO: string,
-  settledAmount?: number
+  settledAmount?: number,
+  options?: PayInstallmentOptions
 ): InstallmentPlan {
   migrateCategoriesFromLegacyOnce()
   migrateTransactionsFromLegacyOnce()
@@ -1434,6 +1508,12 @@ export function payInstallment(
   const date = paymentDateISO.trim()
   if (!date) throw new Error("Informe a data de lançamento.")
   parseISODateParts(date)
+  const txDate = options?.transactionDateIso?.trim() || date
+  if (!txDate) throw new Error("Informe a data de lançamento.")
+  parseISODateParts(txDate)
+  if (txDate > todayISODate()) {
+    throw new Error("Não é possível registrar lançamento em data futura.")
+  }
   const normalizedSettledAmount = settledAmount ?? target.amount
   if (!Number.isFinite(normalizedSettledAmount) || normalizedSettledAmount <= 0) {
     throw new Error("Informe um valor válido para o lançamento.")
@@ -1450,7 +1530,7 @@ export function payInstallment(
     paymentMethod: plan.paymentMethod,
     accountId: plan.accountId,
     cardId: plan.cardId,
-    date,
+    date: txDate,
     description: plan.description,
   })
 
@@ -1460,7 +1540,7 @@ export function payInstallment(
       ? {
           ...i,
           status: "posted" as const,
-          postedAt: date,
+          postedAt: txDate,
           settledAmount: normalizedSettledAmount,
           paymentTransactionId: tx.id,
         }
@@ -1479,6 +1559,54 @@ export function payInstallment(
     throw new Error("Não foi possível atualizar o parcelamento.")
   }
   return next
+}
+
+/**
+ * Parcelamentos com autoPost: no crédito, parcelas com vencimento antes do fechamento
+ * no mês corrente podem lançar na fatura aberta antes do vencimento; demais seguem
+ * `dueDate <= hoje`. No débito/caixa, só quando `dueDate <= hoje`.
+ */
+export function sweepAutoPostInstallmentPlans(): void {
+  migrateCategoriesFromLegacyOnce()
+  migrateTransactionsFromLegacyOnce()
+
+  const todayISO = localTodayISODate()
+
+  for (const plan of installmentPlansRepo.list()) {
+    if (plan.status !== "active" || !plan.autoPost) continue
+
+    let current: InstallmentPlan | undefined = plan
+    while (current && current.status === "active" && current.autoPost) {
+      const activePlan = current
+      const card =
+        activePlan.paymentMethod === "credit_card" && activePlan.cardId
+          ? getCardById(activePlan.cardId)
+          : undefined
+      const candidates = activePlan.installments.filter((i) =>
+        installmentReservedForAutoPost(activePlan, i, todayISO, card)
+      )
+      if (candidates.length === 0) break
+      candidates.sort((a, b) => {
+        const byDue = a.dueDate.localeCompare(b.dueDate)
+        if (byDue !== 0) return byDue
+        return a.number - b.number
+      })
+      const nextInst = candidates[0]
+      const ledgerDate = installmentAutoPostLedgerDate(
+        activePlan,
+        nextInst,
+        todayISO,
+        card
+      )
+      try {
+        current = payInstallment(activePlan.id, nextInst.id, nextInst.dueDate, undefined, {
+          transactionDateIso: ledgerDate,
+        })
+      } catch {
+        break
+      }
+    }
+  }
 }
 
 export function cancelInstallmentPlan(id: string): InstallmentPlan {

@@ -8,6 +8,7 @@ import {
   listInstallmentPlans,
   payInstallment,
   updateInstallmentPlan,
+  type PayInstallmentOptions,
 } from "@/services/localStorage/finance-storage"
 import type {
   CreateInstallmentPlanInput,
@@ -53,9 +54,16 @@ export function useInstallmentPlans() {
       planId: string,
       installmentId: string,
       paymentDateISO: string,
-      settledAmount?: number
+      settledAmount?: number,
+      options?: PayInstallmentOptions
     ) => {
-      const next = payInstallment(planId, installmentId, paymentDateISO, settledAmount)
+      const next = payInstallment(
+        planId,
+        installmentId,
+        paymentDateISO,
+        settledAmount,
+        options
+      )
       refresh()
       return next
     },

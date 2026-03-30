@@ -9,6 +9,11 @@ export interface Card {
   closingDay: number
   dueDay: number
   limit: number
+  /**
+   * Cor principal do gradiente na visualização da carteira (`#rrggbb`).
+   * String vazia = gradiente automático pelo id do cartão.
+   */
+  walletAccentHex: string
   createdAt: string
   updatedAt: string
 }

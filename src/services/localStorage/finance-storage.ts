@@ -1109,6 +1109,15 @@ export function launchRecurringRule(
   if (!date) {
     throw new Error("Informe a data do lançamento.")
   }
+  if (
+    rule.frequency === "monthly" &&
+    rule.lastPostedAt &&
+    rule.lastPostedAt.slice(0, 7) === date.slice(0, 7)
+  ) {
+    throw new Error(
+      "Esta recorrência já foi lançada neste mês. Aguarde virar o mês para lançar novamente."
+    )
+  }
   const amount = launchAmount ?? rule.amount
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new Error("Informe um valor válido para o lançamento.")

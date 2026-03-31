@@ -76,17 +76,57 @@ export function ParceladasPage() {
   const installmentSummary = useMemo(() => {
     let totalReserved = 0
     let activeCount = 0
-    let nextDue: string | null = null
+    let totalPaid = 0
+    let totalSaved = 0
+    let openInstallments = 0
+    let totalPlans = sortedPlans.length
+    let nextDue: {
+      date: string
+      amount: number
+      planTitle: string
+      installmentNumber: number
+      installmentCount: number
+    } | null = null
     for (const p of sortedPlans) {
-      if (p.status !== "active") continue
-      activeCount += 1
-      totalReserved += p.reservedAmount
+      if (p.status === "active") {
+        activeCount += 1
+        totalReserved += p.reservedAmount
+      }
       for (const i of p.installments) {
+        if (i.status === "posted") {
+          const paidAmount =
+            typeof i.settledAmount === "number" ? i.settledAmount : i.amount
+          totalPaid += paidAmount
+          totalSaved += Math.max(0, i.amount - paidAmount)
+          continue
+        }
         if (i.status !== "reserved") continue
-        if (nextDue === null || i.dueDate < nextDue) nextDue = i.dueDate
+        openInstallments += 1
+        if (p.status !== "active") continue
+        if (
+          nextDue === null ||
+          i.dueDate < nextDue.date ||
+          (i.dueDate === nextDue.date && i.number < nextDue.installmentNumber)
+        ) {
+          nextDue = {
+            date: i.dueDate,
+            amount: i.amount,
+            planTitle: p.title,
+            installmentNumber: i.number,
+            installmentCount: p.installmentCount,
+          }
+        }
       }
     }
-    return { totalReserved, activeCount, nextDue }
+    return {
+      totalReserved,
+      activeCount,
+      totalPaid,
+      totalSaved,
+      openInstallments,
+      totalPlans,
+      nextDue,
+    }
   }, [sortedPlans])
 
   const openCreate = () => {
@@ -236,6 +276,40 @@ export function ParceladasPage() {
                 Soma do valor ainda em aberto ou reservado no limite, apenas
                 parcelamentos com status ativo.
               </p>
+              <div className="mt-4 grid gap-3 border-t border-border/80 pt-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wider">
+                    Já pago
+                  </p>
+                  <p className="mt-1 text-sm font-semibold tabular-nums">
+                    {formatCurrencyBRL(installmentSummary.totalPaid)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wider">
+                    Economizado
+                  </p>
+                  <p className="mt-1 text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                    {formatCurrencyBRL(installmentSummary.totalSaved)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wider">
+                    Parcelas em aberto
+                  </p>
+                  <p className="mt-1 text-sm font-semibold tabular-nums">
+                    {installmentSummary.openInstallments}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wider">
+                    Total de planos
+                  </p>
+                  <p className="mt-1 text-sm font-semibold tabular-nums">
+                    {installmentSummary.totalPlans}
+                  </p>
+                </div>
+              </div>
             </div>
             <div className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-muted/20 p-5 shadow-sm ring-1 ring-black/5 dark:bg-muted/15 dark:ring-white/10">
               <div>
@@ -245,10 +319,26 @@ export function ParceladasPage() {
                 <p className="font-heading mt-2 text-xl font-bold tabular-nums tracking-tight">
                   {installmentSummary.nextDue
                     ? new Date(
-                        `${installmentSummary.nextDue}T00:00:00`
+                        `${installmentSummary.nextDue.date}T00:00:00`
                       ).toLocaleDateString("pt-BR")
                     : "—"}
                 </p>
+                {installmentSummary.nextDue ? (
+                  <div className="text-muted-foreground mt-2 space-y-1 text-xs">
+                    <p className="font-medium tabular-nums text-foreground/90">
+                      {formatCurrencyBRL(installmentSummary.nextDue.amount)}
+                    </p>
+                    <p className="truncate">{installmentSummary.nextDue.planTitle}</p>
+                    <p>
+                      Parcela {installmentSummary.nextDue.installmentNumber}/
+                      {installmentSummary.nextDue.installmentCount}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground mt-2 text-xs">
+                    Sem parcelas pendentes no momento.
+                  </p>
+                )}
               </div>
               <div className="border-t border-border/80 pt-4">
                 <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">

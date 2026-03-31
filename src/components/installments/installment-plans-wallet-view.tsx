@@ -88,6 +88,22 @@ function installmentAmountLabel(installment: Installment): string {
   return `${formatCurrencyBRL(installment.amount)} (pago antecipadamente com desconto: ${formatCurrencyBRL(installment.settledAmount)})`
 }
 
+function paidAmount(plan: InstallmentPlan): number {
+  return plan.installments.reduce((sum, installment) => {
+    if (installment.status !== "posted") return sum
+    if (typeof installment.settledAmount === "number") return sum + installment.settledAmount
+    return sum + installment.amount
+  }, 0)
+}
+
+function savedAmount(plan: InstallmentPlan): number {
+  return plan.installments.reduce((sum, installment) => {
+    if (installment.status !== "posted") return sum
+    if (typeof installment.settledAmount !== "number") return sum
+    return sum + Math.max(0, installment.amount - installment.settledAmount)
+  }, 0)
+}
+
 export function InstallmentPlansWalletView({
   plans,
   categoryNameById,
@@ -123,6 +139,14 @@ export function InstallmentPlansWalletView({
   const selected = useMemo(
     () => plans.find((p) => p.id === selectedId) ?? plans[0] ?? null,
     [plans, selectedId]
+  )
+  const selectedPaidAmount = useMemo(
+    () => (selected ? paidAmount(selected) : 0),
+    [selected]
+  )
+  const selectedSavedAmount = useMemo(
+    () => (selected ? savedAmount(selected) : 0),
+    [selected]
   )
 
   return (
@@ -181,39 +205,31 @@ export function InstallmentPlansWalletView({
                   />
                   <div className="relative flex min-h-0 flex-1 flex-col">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 flex-1 items-center gap-2">
-                        <AccountAvatar
-                          name={plan.title}
-                          logoDataUrl={plan.logoDataUrl}
-                          sizeClassName="size-10 shrink-0"
-                          entityLabel="parcelamento"
-                          entityArticle="do"
-                        />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold tracking-tight">
-                            {plan.title}
-                          </p>
-                          <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] font-medium uppercase tracking-wider text-white/60">
-                            {isCompleted ? (
-                              <span className="inline-flex items-center gap-0.5 text-emerald-200">
-                                <CheckIcon className="size-3" />
-                                Quitado
-                              </span>
-                            ) : isCancelled ? (
-                              <span className="inline-flex items-center gap-0.5 text-amber-200">
-                                <BanIcon className="size-3" />
-                                Cancelado
-                              </span>
-                            ) : (
+                      {!isCompleted && !isCancelled ? (
+                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                          <AccountAvatar
+                            name={plan.title}
+                            logoDataUrl={plan.logoDataUrl}
+                            sizeClassName="size-12 shrink-0"
+                            entityLabel="parcelamento"
+                            entityArticle="do"
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold tracking-tight">
+                              {plan.title}
+                            </p>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] font-medium uppercase tracking-wider text-white/60">
                               <span>Ativo</span>
-                            )}
-                            <span className="text-white/40">·</span>
-                            <span>
-                              {paid}/{plan.installmentCount} parcelas
-                            </span>
+                              <span className="text-white/40">·</span>
+                              <span>
+                                {paid}/{plan.installmentCount} parcelas
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div />
+                      )}
                       <Popover
                         onOpenChange={(open) => {
                           if (open) skipNextSelectRef.current = false
@@ -282,37 +298,71 @@ export function InstallmentPlansWalletView({
                         </PopoverContent>
                       </Popover>
                     </div>
-
-                    <div className="mt-4 space-y-2">
-                      <div
-                        className="h-1.5 w-full overflow-hidden rounded-full bg-white/20"
-                        role="progressbar"
-                        aria-valuenow={progress}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                      >
-                        <div
-                          className="h-full rounded-full bg-white/90 transition-[width] duration-300"
-                          style={{ width: `${progress}%` }}
-                        />
+                    {isCompleted || isCancelled ? (
+                      <div className="flex min-h-0 flex-1 items-center justify-center">
+                        <div className="flex flex-col items-center text-center">
+                          <AccountAvatar
+                            name={plan.title}
+                            logoDataUrl={plan.logoDataUrl}
+                            sizeClassName="size-14 shrink-0"
+                            entityLabel="parcelamento"
+                            entityArticle="do"
+                          />
+                          <p className="mt-3 max-w-full truncate text-base font-semibold tracking-tight">
+                            {plan.title}
+                          </p>
+                          <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-[11px] font-medium uppercase tracking-wider text-white/70">
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1",
+                                isCompleted ? "text-emerald-200" : "text-amber-200"
+                              )}
+                            >
+                              {isCompleted ? (
+                                <CheckIcon className="size-3.5" />
+                              ) : (
+                                <BanIcon className="size-3.5" />
+                              )}
+                              {isCompleted ? "Pago" : "Cancelado"}
+                            </span>
+                            <span className="text-white/40">·</span>
+                            <span>{plan.installmentCount} parcelas</span>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-[11px] font-medium uppercase tracking-wider text-white/55">
-                        {remainingAmountLabel(plan.paymentMethod)}
-                      </p>
-                      <p
-                        className={cn(
-                          "font-heading text-2xl font-bold tabular-nums tracking-tight",
-                          isIncome ? "text-emerald-300" : "text-white"
-                        )}
-                      >
-                        {formatCurrencyBRL(remaining)}
-                      </p>
-                      <p className="text-[11px] leading-snug text-white/55">
-                        Total {formatCurrencyBRL(plan.totalAmount)} ·{" "}
-                        {plan.installmentCount}x ·{" "}
-                        {isIncome ? "Entrada" : "Despesa"}
-                      </p>
-                    </div>
+                    ) : null}
+                    {!isCompleted && !isCancelled ? (
+                      <div className="mt-4 space-y-2">
+                        <div
+                          className="h-1.5 w-full overflow-hidden rounded-full bg-white/20"
+                          role="progressbar"
+                          aria-valuenow={progress}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                        >
+                          <div
+                            className="h-full rounded-full bg-white/90 transition-[width] duration-300"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-white/55">
+                          {remainingAmountLabel(plan.paymentMethod)}
+                        </p>
+                        <p
+                          className={cn(
+                            "font-heading text-2xl font-bold tabular-nums tracking-tight",
+                            isIncome ? "text-emerald-300" : "text-white"
+                          )}
+                        >
+                          {formatCurrencyBRL(remaining)}
+                        </p>
+                        <p className="text-[11px] leading-snug text-white/55">
+                          Total {formatCurrencyBRL(plan.totalAmount)} ·{" "}
+                          {plan.installmentCount}x ·{" "}
+                          {isIncome ? "Entrada" : "Despesa"}
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -348,6 +398,12 @@ export function InstallmentPlansWalletView({
               </Badge>
               <Badge variant="outline" className="font-normal">
                 {categoryNameById.get(selected.categoryId) ?? "Categoria removida"}
+              </Badge>
+              <Badge variant="outline" className="font-normal">
+                Total pago: {formatCurrencyBRL(selectedPaidAmount)}
+              </Badge>
+              <Badge variant="outline" className="font-normal text-emerald-700 dark:text-emerald-300">
+                Economizado: {formatCurrencyBRL(selectedSavedAmount)}
               </Badge>
             </div>
           </div>
@@ -393,20 +449,43 @@ export function InstallmentPlansWalletView({
                       ? postedInstallmentLabel(selected.paymentMethod)
                       : installmentStatusLabel(installment, selected.paymentMethod)}
                   </Badge>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="default"
-                    className="font-semibold"
-                    disabled={
-                      installment.status !== "reserved" ||
-                      selected.status === "cancelled"
-                    }
-                    onClick={() => onPay(selected, installment)}
-                  >
-                    <CheckIcon data-icon="inline-start" />
-                    {payButtonLabel(selected.paymentMethod)}
-                  </Button>
+                  {installment.status === "reserved" &&
+                  selected.status !== "cancelled" ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="default"
+                      className="font-semibold"
+                      onClick={() => onPay(selected, installment)}
+                    >
+                      <CheckIcon data-icon="inline-start" />
+                      {payButtonLabel(selected.paymentMethod)}
+                    </Button>
+                  ) : installment.status === "posted" ? (
+                    <span
+                      className="text-emerald-600 dark:text-emerald-300"
+                      title={postedInstallmentLabel(selected.paymentMethod)}
+                      aria-label={postedInstallmentLabel(selected.paymentMethod)}
+                    >
+                      <CheckIcon className="size-4" />
+                    </span>
+                  ) : (
+                    <span
+                      className="text-amber-600 dark:text-amber-300"
+                      title={
+                        installment.status === "cancelled"
+                          ? "Cancelada"
+                          : "Plano cancelado"
+                      }
+                      aria-label={
+                        installment.status === "cancelled"
+                          ? "Cancelada"
+                          : "Plano cancelado"
+                      }
+                    >
+                      <BanIcon className="size-4" />
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

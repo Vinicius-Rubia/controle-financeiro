@@ -288,6 +288,12 @@ export function InstallmentPlanFormDialog({
           card
         )
       }
+      if (!planToEdit && firstDueDateStr < todayISODate()) {
+        form.setError("firstDueDate", {
+          message: "A data do primeiro vencimento não pode ser no passado.",
+        })
+        return
+      }
 
       if (planToEdit) {
         const next = onUpdate({
@@ -502,6 +508,7 @@ export function InstallmentPlanFormDialog({
                   <Input
                     id="totalAmount"
                     inputMode="numeric"
+                    placeholder="0,00"
                     value={field.value}
                     onChange={(e) => field.onChange(maskCurrencyInputBR(e.target.value))}
                   />
@@ -670,6 +677,11 @@ export function InstallmentPlanFormDialog({
                       <Calendar
                         mode="single"
                         selected={field.value ? isoDateToLocalDate(field.value) : undefined}
+                        disabled={
+                          !isEdit && !needsCard
+                            ? { before: isoDateToLocalDate(todayISODate()) }
+                            : undefined
+                        }
                         onSelect={(date) => {
                           if (!date) return
                           field.onChange(format(date, "yyyy-MM-dd"))

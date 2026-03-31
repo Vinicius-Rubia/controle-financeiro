@@ -9,7 +9,8 @@ const ISO_RX = /^(\d{4})-(\d{2})-(\d{2})$/
 
 /**
  * Data de fechamento da fatura em que entra a compra com `isoDate` (`YYYY-MM-DD`).
- * Regra: tudo após o fechamento do mês anterior até este fechamento (inclusive o dia do fechamento).
+ * Regra: tudo após o fechamento do mês anterior até o dia anterior ao fechamento atual.
+ * Compra feita no dia do fechamento entra no próximo ciclo.
  */
 export function closingDateForPurchaseDate(
   isoDate: string,
@@ -23,7 +24,7 @@ export function closingDateForPurchaseDate(
   const m0 = month1 - 1
   const lastDay = daysInMonth(y, m0)
   const closeD = Math.min(closingDay, lastDay)
-  if (d <= closeD) {
+  if (d < closeD) {
     return `${y}-${String(month1).padStart(2, "0")}-${String(closeD).padStart(2, "0")}`
   }
   let nm = m0 + 1

@@ -4,6 +4,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { AccountAvatar } from "@/components/accounts/account-avatar"
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
   Table,
   TableBody,
   TableCell,
@@ -22,6 +27,15 @@ import {
 } from "@/lib/transaction-ui"
 import { cn } from "@/lib/utils"
 import type { RecurringRule } from "@/types/recurring"
+
+function monthKeyFromIsoDate(isoDate: string): string {
+  return isoDate.slice(0, 7)
+}
+
+function currentMonthKey(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+}
 
 export function RecurringListTable({
   rules,
@@ -77,6 +91,14 @@ export function RecurringListTable({
         {rules.map((r) => {
           const cat = categoryNameById.get(r.categoryId)
           const isIncome = r.type === "income"
+          const alreadyLaunchedThisMonth =
+            r.frequency === "monthly" &&
+            !!r.lastPostedAt &&
+            monthKeyFromIsoDate(r.lastPostedAt) === currentMonthKey()
+          const launchDisabled = !r.active || alreadyLaunchedThisMonth
+          const launchDisabledMessage = !r.active
+            ? "Ative a recorrência para lançar."
+            : "Esta recorrência já foi lançada neste mês. Aguarde virar o mês para lançar novamente."
           return (
             <TableRow
               key={r.id}
@@ -149,22 +171,37 @@ export function RecurringListTable({
               </TableCell>
               <TableCell className="px-6 py-4 text-right">
                 <div className="flex flex-wrap items-center justify-end gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1 px-2"
-                    disabled={!r.active}
-                    title={
-                      r.active
-                        ? "Registrar nas movimentações"
-                        : "Ative a recorrência para lançar"
-                    }
-                    onClick={() => onLaunch(r)}
-                  >
-                    <RocketIcon className="size-3.5" />
-                    <span className="hidden sm:inline">Lançar</span>
-                  </Button>
+                  {launchDisabled ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1 px-2"
+                            disabled
+                          >
+                            <RocketIcon className="size-3.5" />
+                            <span className="hidden sm:inline">Lançar</span>
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{launchDisabledMessage}</TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1 px-2"
+                      title="Registrar nas movimentações"
+                      onClick={() => onLaunch(r)}
+                    >
+                      <RocketIcon className="size-3.5" />
+                      <span className="hidden sm:inline">Lançar</span>
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="ghost"

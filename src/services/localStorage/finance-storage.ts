@@ -15,13 +15,21 @@ import type {
   InstallmentPlan,
   UpdateInstallmentPlanInput,
 } from "@/types/installment"
-import { normalizeWalletAccentHex } from "@/lib/card-wallet-accent"
+import {
+  isValidWalletAccentHex,
+  normalizeWalletAccentHex,
+} from "@/lib/card-wallet-accent"
 import type { Card, CreateCardInput, UpdateCardInput } from "@/types/card"
 import type {
   CreateRecurringRuleInput,
   RecurringRule,
   UpdateRecurringRuleInput,
 } from "@/types/recurring"
+import type {
+  CreatePlannedPaymentInput,
+  PlannedPayment,
+  UpdatePlannedPaymentInput,
+} from "@/types/planned-payment"
 import type {
   CreateAccountTransferInput,
   CreateTransactionInput,
@@ -35,12 +43,14 @@ import {
   assertCreateCardInput,
   assertCreateCategoryInput,
   assertCreateInstallmentPlanInput,
+  assertCreatePlannedPaymentInput,
   assertCreateRecurringRuleInput,
   assertCreateTransactionInput,
   parseAccount,
   parseCard,
   parseCategory,
   parseInstallmentPlan,
+  parsePlannedPayment,
   parseRecurringRule,
   parseTransaction,
 } from "./entity-parsers"
@@ -253,6 +263,11 @@ const recurringRepo = createLocalStorageRepository<RecurringRule>({
 const installmentPlansRepo = createLocalStorageRepository<InstallmentPlan>({
   storageKey: STORAGE_KEYS.installmentPlans,
   parseItem: parseInstallmentPlan,
+})
+
+const plannedPaymentsRepo = createLocalStorageRepository<PlannedPayment>({
+  storageKey: STORAGE_KEYS.plannedPayments,
+  parseItem: parsePlannedPayment,
 })
 
 let categoriesLegacyMigrated = false
@@ -1198,6 +1213,123 @@ export function sweepAutoPostRecurringRules(): void {
       updatedAt: ts,
     })
   }
+}
+
+// ——— Planejamentos ———
+
+export function listPlannedPayments(): PlannedPayment[] {
+  migrateCategoriesFromLegacyOnce()
+  return plannedPaymentsRepo.list()
+}
+
+export function getPlannedPaymentById(id: string): PlannedPayment | undefined {
+  migrateCategoriesFromLegacyOnce()
+  return plannedPaymentsRepo.getById(id)
+}
+
+export function createPlannedPayment(
+  input: CreatePlannedPaymentInput
+): PlannedPayment {
+  migrateCategoriesFromLegacyOnce()
+  if (!assertCreatePlannedPaymentInput(input)) {
+    throw new Error("Dados de planejamento inválidos.")
+  }
+  const category = getCategoryById(input.categoryId.trim())
+  if (!category) throw new Error("Categoria não encontrada.")
+  if (!categoryAcceptsTransactionType(category, input.type)) {
+    throw new Error("Tipo de lançamento incompatível com a categoria.")
+  }
+  const now = new Date()
+  const yearNow = now.getFullYear()
+  const monthNow = now.getMonth() + 1
+  if (input.targetYear < yearNow) {
+    throw new Error("Escolha o ano atual ou um ano futuro.")
+  }
+  if (input.targetYear === yearNow && input.targetMonth < monthNow) {
+    throw new Error("No ano atual, escolha o mês atual ou um mês futuro.")
+  }
+  const nowIso = new Date().toISOString()
+  const estimatedAmount =
+    typeof input.estimatedAmount === "number" ? input.estimatedAmount : undefined
+  return plannedPaymentsRepo.create(() => ({
+    id: crypto.randomUUID(),
+    title: input.title.trim(),
+    logoDataUrl: input.logoDataUrl,
+    walletAccentHex: normalizeWalletAccentHex(input.walletAccentHex),
+    type: input.type,
+    categoryId: input.categoryId.trim(),
+    targetYear: Math.trunc(input.targetYear),
+    targetMonth: Math.trunc(input.targetMonth),
+    estimatedAmount,
+    description: input.description,
+    status: "pending",
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  }))
+}
+
+export function updatePlannedPayment(
+  input: UpdatePlannedPaymentInput
+): PlannedPayment | null {
+  migrateCategoriesFromLegacyOnce()
+  const current = plannedPaymentsRepo.getById(input.id)
+  if (!current) return null
+  const { id, ...rest } = input
+  const patch = omitUndefined(rest) as Partial<Omit<PlannedPayment, "id">>
+  const merged: PlannedPayment = { ...current, ...patch, id: current.id }
+
+  if (!merged.title.trim()) return null
+  if (
+    !Number.isFinite(merged.targetYear) ||
+    merged.targetYear < 1900 ||
+    merged.targetYear > 9999
+  ) {
+    return null
+  }
+  if (
+    !Number.isFinite(merged.targetMonth) ||
+    merged.targetMonth < 1 ||
+    merged.targetMonth > 12
+  ) {
+    return null
+  }
+  const now = new Date()
+  const yearNow = now.getFullYear()
+  const monthNow = now.getMonth() + 1
+  if (merged.targetYear < yearNow) return null
+  if (merged.targetYear === yearNow && merged.targetMonth < monthNow) return null
+  if (
+    merged.estimatedAmount !== undefined &&
+    (!Number.isFinite(merged.estimatedAmount) || merged.estimatedAmount <= 0)
+  ) {
+    return null
+  }
+  if (typeof merged.logoDataUrl !== "string") return null
+  if (typeof merged.walletAccentHex !== "string") return null
+  if (!isValidWalletAccentHex(merged.walletAccentHex)) return null
+  if (typeof merged.description !== "string") return null
+  if (merged.status !== "pending") return null
+  const category = getCategoryById(merged.categoryId)
+  if (!category) return null
+  if (!categoryAcceptsTransactionType(category, merged.type)) return null
+
+  return plannedPaymentsRepo.update(id, {
+    title: merged.title.trim(),
+    logoDataUrl: merged.logoDataUrl,
+    walletAccentHex: normalizeWalletAccentHex(merged.walletAccentHex),
+    type: merged.type,
+    categoryId: merged.categoryId.trim(),
+    targetYear: Math.trunc(merged.targetYear),
+    targetMonth: Math.trunc(merged.targetMonth),
+    estimatedAmount: merged.estimatedAmount,
+    description: merged.description,
+    status: merged.status,
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+export function deletePlannedPayment(id: string): boolean {
+  return plannedPaymentsRepo.remove(id)
 }
 
 // ——— Parceladas ———

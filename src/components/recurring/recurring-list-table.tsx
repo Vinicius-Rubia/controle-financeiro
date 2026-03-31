@@ -124,7 +124,13 @@ export function RecurringListTable({
                 </div>
               </TableCell>
               <TableCell className="px-6 py-4">
-                <Badge variant={isIncome ? "default" : "destructive"}>
+                <Badge
+                  variant={isIncome ? "outline" : "destructive"}
+                  className={cn(
+                    isIncome &&
+                      "border-emerald-500/20 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400"
+                  )}
+                >
                   {transactionTypeLabel(r.type)}
                 </Badge>
               </TableCell>

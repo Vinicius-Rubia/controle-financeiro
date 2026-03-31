@@ -9,6 +9,7 @@ import { DashboardPage } from "@/pages/dashboard-page"
 import { DadosPage } from "@/pages/dados-page"
 import { MovimentacoesPage } from "@/pages/movimentacoes-page"
 import { ParceladasPage } from "@/pages/parceladas-page"
+import { PlanejamentosPage } from "@/pages/planejamentos-page"
 import { RelatoriosPage } from "@/pages/relatorios-page"
 import { RecorrenciasPage } from "@/pages/recorrencias-page"
 
@@ -23,6 +24,7 @@ export function AppRoutes() {
         <Route path="contas" element={<ContasPage />} />
         <Route path="cartoes" element={<CartoesPage />} />
         <Route path="parcelamentos" element={<ParceladasPage />} />
+        <Route path="planejamentos" element={<PlanejamentosPage />} />
         <Route path="movimentacoes" element={<MovimentacoesPage />} />
         <Route path="recorrencias" element={<RecorrenciasPage />} />
         <Route path="dados" element={<DadosPage />} />

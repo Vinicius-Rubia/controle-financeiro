@@ -3,6 +3,7 @@
 import { Link, NavLink, useMatch } from "react-router-dom"
 import {
   ArrowDownUp,
+  CalendarClock,
   CreditCard,
   Database,
   HandCoins,
@@ -35,6 +36,7 @@ const NAV = [
   { to: ROUTES.cartoes, label: "Cartões", icon: CreditCard },
   { to: ROUTES.parcelamentos, label: "Parcelamentos", icon: HandCoins },
   { to: ROUTES.recorrencias, label: "Recorrências", icon: Repeat },
+  { to: ROUTES.planejamentos, label: "Planejamentos", icon: CalendarClock },
   { to: ROUTES.movimentacoes, label: "Entradas/Saídas", icon: ArrowDownUp },
   { to: ROUTES.dados, label: "Dados locais", icon: Database },
 ] as const

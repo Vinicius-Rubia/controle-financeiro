@@ -92,6 +92,15 @@ const formSchema = z.object({
 })
 
 type FormValues = z.infer<typeof formSchema>
+export type InstallmentPlanFormPrefill = {
+  title?: string
+  logoDataUrl?: string
+  walletAccentHex?: string
+  type?: TransactionType
+  categoryId?: string
+  totalAmountFormatted?: string
+  firstDueDate?: string
+}
 
 function isoDateToLocalDate(iso: string): Date {
   const [year, month, day] = iso.split("-").map((n) => Number(n))
@@ -115,23 +124,24 @@ function firstCategoryIdForType(categories: Category[], type: TransactionType): 
 function defaultValues(
   plan: InstallmentPlan | null,
   categories: Category[],
-  accounts: Account[]
+  accounts: Account[],
+  prefill?: InstallmentPlanFormPrefill
 ): FormValues {
   if (!plan) {
-    const type: TransactionType = "expense"
+    const type: TransactionType = prefill?.type ?? "expense"
     return {
-      title: "",
-      logoDataUrl: "",
-      totalAmount: "",
+      title: prefill?.title ?? "",
+      logoDataUrl: prefill?.logoDataUrl ?? "",
+      totalAmount: prefill?.totalAmountFormatted ?? "",
       installmentCount: "2",
-      firstDueDate: todayISODate(),
+      firstDueDate: prefill?.firstDueDate ?? todayISODate(),
       type,
-      categoryId: firstCategoryIdForType(categories, type),
+      categoryId: prefill?.categoryId ?? firstCategoryIdForType(categories, type),
       paymentMethod: "pix",
       accountId: firstActiveAccountId(accounts),
       cardId: "",
       description: "",
-      walletAccentHex: "",
+      walletAccentHex: normalizeWalletAccentHex(prefill?.walletAccentHex ?? ""),
       autoPost: false,
     }
   }
@@ -159,6 +169,7 @@ export function InstallmentPlanFormDialog({
   accounts,
   cards,
   planToEdit,
+  prefill,
   onCreate,
   onUpdate,
 }: {
@@ -168,6 +179,7 @@ export function InstallmentPlanFormDialog({
   accounts: Account[]
   cards: Card[]
   planToEdit: InstallmentPlan | null
+  prefill?: InstallmentPlanFormPrefill
   onCreate: (input: CreateInstallmentPlanInput) => void
   onUpdate: (input: UpdateInstallmentPlanInput) => InstallmentPlan | null
 }) {
@@ -176,7 +188,7 @@ export function InstallmentPlanFormDialog({
   const [firstDueDatePickerOpen, setFirstDueDatePickerOpen] = useState(false)
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: defaultValues(planToEdit, categories, accounts),
+    defaultValues: defaultValues(planToEdit, categories, accounts, prefill),
   })
 
   const txType = useWatch({ control: form.control, name: "type" }) ?? "expense"
@@ -210,10 +222,10 @@ export function InstallmentPlanFormDialog({
 
   useEffect(() => {
     if (!open) return
-    const d = defaultValues(planToEdit, categories, accounts)
+    const d = defaultValues(planToEdit, categories, accounts, prefill)
     form.reset(d)
     prevPaymentMethodRef.current = d.paymentMethod
-  }, [open, planToEdit, categories, accounts, form])
+  }, [open, planToEdit, categories, accounts, prefill, form])
 
   useEffect(() => {
     if (!open || isEdit) return

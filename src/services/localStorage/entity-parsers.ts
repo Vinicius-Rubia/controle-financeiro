@@ -16,6 +16,7 @@ import type {
   RecurringFrequency,
   RecurringRule,
 } from "@/types/recurring"
+import type { CreatePlannedPaymentInput, PlannedPayment } from "@/types/planned-payment"
 import type { PaymentMethod, Transaction, TransactionType } from "@/types/transaction"
 
 function isNonEmptyString(v: unknown): v is string {
@@ -503,6 +504,56 @@ export function parseInstallmentPlan(raw: unknown): InstallmentPlan | null {
   }
 }
 
+export function parsePlannedPayment(raw: unknown): PlannedPayment | null {
+  if (!raw || typeof raw !== "object") return null
+  const o = raw as Record<string, unknown>
+  if (!isNonEmptyString(o.id)) return null
+  if (!isNonEmptyString(o.title)) return null
+  const logoDataUrl = typeof o.logoDataUrl === "string" ? o.logoDataUrl : ""
+  const walletAccentHex = normalizeWalletAccentHex(
+    typeof o.walletAccentHex === "string" ? o.walletAccentHex : ""
+  )
+  const type = parseTransactionType(o)
+  if (!type) return null
+  if (!isNonEmptyString(o.categoryId)) return null
+  if (!isFiniteNumber(o.targetYear) || o.targetYear < 1900 || o.targetYear > 9999) {
+    return null
+  }
+  if (!isFiniteNumber(o.targetMonth) || o.targetMonth < 1 || o.targetMonth > 12) {
+    return null
+  }
+  const amount = o.estimatedAmount
+  const estimatedAmount =
+    amount === undefined
+      ? undefined
+      : isFiniteNumber(amount) && amount > 0
+        ? amount
+        : null
+  if (estimatedAmount === null) return null
+  const description = typeof o.description === "string" ? o.description : ""
+  const status = o.status === "pending" ? "pending" : null
+  if (!status) return null
+  const createdAt = isNonEmptyString(o.createdAt) ? o.createdAt.trim() : null
+  if (!createdAt) return null
+  let updatedAt = isNonEmptyString(o.updatedAt) ? o.updatedAt.trim() : null
+  if (!updatedAt) updatedAt = createdAt
+  return {
+    id: o.id.trim(),
+    title: o.title.trim(),
+    logoDataUrl,
+    walletAccentHex,
+    type,
+    categoryId: o.categoryId.trim(),
+    targetYear: Math.trunc(o.targetYear),
+    targetMonth: Math.trunc(o.targetMonth),
+    estimatedAmount,
+    description,
+    status,
+    createdAt,
+    updatedAt,
+  }
+}
+
 /** Valida entrada antes de persistir (create/update). */
 export function assertCreateCategoryInput(
   input: unknown
@@ -640,6 +691,37 @@ export function assertCreateRecurringRuleInput(
       return false
     }
   }
+  return true
+}
+
+export function assertCreatePlannedPaymentInput(
+  input: unknown
+): input is CreatePlannedPaymentInput {
+  if (!input || typeof input !== "object") return false
+  const o = input as Record<string, unknown>
+  const now = new Date()
+  const yearNow = now.getFullYear()
+  const monthNow = now.getMonth() + 1
+  if (!isNonEmptyString(o.title)) return false
+  if (typeof o.logoDataUrl !== "string") return false
+  if (typeof o.walletAccentHex !== "string") return false
+  if (!isValidWalletAccentHex(o.walletAccentHex)) return false
+  if (o.type !== "income" && o.type !== "expense") return false
+  if (!isNonEmptyString(o.categoryId)) return false
+  if (!isFiniteNumber(o.targetYear) || o.targetYear < yearNow || o.targetYear > 9999) {
+    return false
+  }
+  if (!isFiniteNumber(o.targetMonth) || o.targetMonth < 1 || o.targetMonth > 12) {
+    return false
+  }
+  if (o.targetYear === yearNow && o.targetMonth < monthNow) return false
+  if (
+    o.estimatedAmount !== undefined &&
+    (!isFiniteNumber(o.estimatedAmount) || o.estimatedAmount <= 0)
+  ) {
+    return false
+  }
+  if (typeof o.description !== "string") return false
   return true
 }
 

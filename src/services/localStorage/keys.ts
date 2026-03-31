@@ -6,6 +6,7 @@ export const STORAGE_KEYS = {
   accounts: "controle-financeiro.accounts.v1",
   recurring: "controle-financeiro.recurring.v1",
   installmentPlans: "controle-financeiro.installment-plans.v1",
+  plannedPayments: "controle-financeiro.planned-payments.v1",
 } as const
 
 /** Chaves legadas (v1) — usadas só para migração pontual na primeira leitura. */

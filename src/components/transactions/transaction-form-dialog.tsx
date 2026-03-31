@@ -102,6 +102,12 @@ const transactionFormSchema = z.object({
 })
 
 type TransactionFormValues = z.infer<typeof transactionFormSchema>
+export type TransactionFormPrefill = {
+  title?: string
+  type?: TransactionType
+  categoryId?: string
+  amountFormatted?: string
+}
 
 function isoDateToLocalDate(iso: string): Date {
   const [year, month, day] = iso.split("-").map((n) => Number(n))
@@ -111,18 +117,19 @@ function isoDateToLocalDate(iso: string): Date {
 function defaultValues(
   transaction: Transaction | null,
   categories: Category[],
-  accounts: Account[]
+  accounts: Account[],
+  prefill?: TransactionFormPrefill
 ): TransactionFormValues {
   if (!transaction) {
-    const type: TransactionType = "expense"
+    const type: TransactionType = prefill?.type ?? "expense"
     return {
-      title: "",
-      amount: "",
+      title: prefill?.title ?? "",
+      amount: prefill?.amountFormatted ?? "",
       type,
       paymentMethod: "pix",
       accountId: firstActiveAccountId(accounts),
       cardId: "",
-      categoryId: firstCategoryIdForType(categories, type),
+      categoryId: prefill?.categoryId ?? firstCategoryIdForType(categories, type),
       date: todayISODate(),
       description: "",
       statementPeriodKey: "",
@@ -153,6 +160,7 @@ export function TransactionFormDialog({
   cards,
   transactions,
   transactionToEdit,
+  prefill,
   onCreate,
   onUpdate,
 }: {
@@ -163,6 +171,7 @@ export function TransactionFormDialog({
   cards: Card[]
   transactions: Transaction[]
   transactionToEdit: Transaction | null
+  prefill?: TransactionFormPrefill
   onCreate: (input: CreateTransactionInput) => void
   onUpdate: (input: UpdateTransactionInput) => Transaction | null
 }) {
@@ -172,7 +181,7 @@ export function TransactionFormDialog({
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
-    defaultValues: defaultValues(transactionToEdit, categories, accounts),
+    defaultValues: defaultValues(transactionToEdit, categories, accounts, prefill),
   })
 
   const txType =
@@ -266,9 +275,9 @@ export function TransactionFormDialog({
 
   useEffect(() => {
     if (open) {
-      form.reset(defaultValues(transactionToEdit, categories, accounts))
+      form.reset(defaultValues(transactionToEdit, categories, accounts, prefill))
     }
-  }, [open, transactionToEdit, categories, accounts, form])
+  }, [open, transactionToEdit, categories, accounts, prefill, form])
 
   useEffect(() => {
     if (paymentMethod === "credit_card_settlement") {

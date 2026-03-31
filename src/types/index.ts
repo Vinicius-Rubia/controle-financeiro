@@ -26,6 +26,12 @@ export type {
   UpdateRecurringRuleInput,
 } from "./recurring"
 export type {
+  CreatePlannedPaymentInput,
+  PlannedPayment,
+  PlannedPaymentStatus,
+  UpdatePlannedPaymentInput,
+} from "./planned-payment"
+export type {
   CreateAccountTransferInput,
   CreateTransactionInput,
   PaymentMethod,

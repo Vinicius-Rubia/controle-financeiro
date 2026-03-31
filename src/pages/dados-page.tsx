@@ -112,16 +112,19 @@ export function DadosPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-          Dados locais
-        </h1>
-        <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-          Exporte ou importe tudo que o app guarda neste navegador (contas,
-          cartões, lançamentos, categorias, recorrências e parcelamentos). Útil
-          para backup, trocar de computador ou manter uma cópia antes de
-          atualizar.
-        </p>
+      <div className="relative overflow-hidden rounded-2xl border bg-card p-6 md:p-8">
+        <div className="from-primary/15 absolute inset-x-0 top-0 h-full bg-gradient-to-r via-transparent to-transparent" />
+        <div className="relative">
+          <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+            Dados locais
+          </h1>
+          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+            Exporte ou importe tudo que o app guarda neste navegador (contas,
+            cartões, lançamentos, categorias, recorrências e parcelamentos). Útil
+            para backup, trocar de computador ou manter uma cópia antes de
+            atualizar.
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

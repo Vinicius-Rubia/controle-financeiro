@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dialog"
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -41,7 +40,7 @@ const categoryFormSchema = z.object({
     .trim()
     .min(1, "Informe o nome.")
     .max(100, "No máximo 100 caracteres."),
-  type: z.enum(["income", "expense", "both"]),
+  type: z.enum(["income", "expense"]),
 })
 
 type CategoryFormValues = z.infer<typeof categoryFormSchema>
@@ -135,8 +134,7 @@ export function CategoryFormDialog({
             {isEdit ? "Editar categoria" : "Nova categoria"}
           </DialogTitle>
           <DialogDescription>
-            Defina um nome e se a categoria vale para receitas, despesas ou
-            ambos.
+            Defina um nome e se a categoria vale para receitas ou despesas.
           </DialogDescription>
         </DialogHeader>
 
@@ -175,13 +173,9 @@ export function CategoryFormDialog({
                   >
                     <ToggleGroupItem value="income">Receita</ToggleGroupItem>
                     <ToggleGroupItem value="expense">Despesa</ToggleGroupItem>
-                    <ToggleGroupItem value="both">Ambos</ToggleGroupItem>
                   </ToggleGroup>
                 )}
               />
-              <FieldDescription>
-                “Ambos” pode ser usado em lançamentos de entrada ou saída.
-              </FieldDescription>
               <FieldError errors={[form.formState.errors.type]} />
             </Field>
           </FieldGroup>

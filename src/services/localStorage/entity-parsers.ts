@@ -64,7 +64,7 @@ function optionalTrimmedString(v: unknown): string | undefined {
 function parseCategoryType(
   raw: Record<string, unknown>
 ): CategoryType | null {
-  if (raw.type === "income" || raw.type === "expense" || raw.type === "both") {
+  if (raw.type === "income" || raw.type === "expense") {
     return raw.type
   }
   if (raw.kind === "income" || raw.kind === "expense") {
@@ -510,9 +510,7 @@ export function assertCreateCategoryInput(
   if (!input || typeof input !== "object") return false
   const o = input as Record<string, unknown>
   if (!isNonEmptyString(o.name)) return false
-  return (
-    o.type === "income" || o.type === "expense" || o.type === "both"
-  )
+  return o.type === "income" || o.type === "expense"
 }
 
 export function assertCreateCardInput(

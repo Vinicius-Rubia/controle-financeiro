@@ -1,4 +1,9 @@
-import { PencilIcon, Trash2Icon } from "lucide-react"
+import {
+  ArrowDownLeftIcon,
+  ArrowUpRightIcon,
+  PencilIcon,
+  Trash2Icon,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -36,7 +41,7 @@ export function TransactionListTable({
   onDelete: (t: Transaction) => void
 }) {
   return (
-    <Table>
+    <Table className="text-sm">
       <TableHeader>
         <TableRow className="hover:bg-transparent">
           <TableHead className="text-muted-foreground min-w-[140px] px-6 py-4 text-xs font-bold uppercase tracking-wider">
@@ -73,8 +78,8 @@ export function TransactionListTable({
           return (
             <TableRow
               key={t.id}
-              className={cn(
-                "border-l-4",
+            className={cn(
+                "group border-l-4 transition-colors",
                 isIncome
                   ? "border-l-emerald-500 bg-emerald-500/[0.06] hover:bg-emerald-500/[0.12] dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20"
                   : "border-l-destructive bg-destructive/5 hover:bg-destructive/12 dark:hover:bg-destructive/20"
@@ -84,7 +89,23 @@ export function TransactionListTable({
                 {formatTransactionDate(t.date)}
               </TableCell>
               <TableCell className="max-w-[220px] px-6 py-4 font-medium">
-                <span className="line-clamp-2 whitespace-normal">{t.title}</span>
+                <div className="flex items-start gap-2.5">
+                  <span
+                    className={cn(
+                      "mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full",
+                      isIncome
+                        ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
+                        : "bg-destructive/15 text-destructive"
+                    )}
+                  >
+                    {isIncome ? (
+                      <ArrowUpRightIcon className="size-4" />
+                    ) : (
+                      <ArrowDownLeftIcon className="size-4" />
+                    )}
+                  </span>
+                  <span className="line-clamp-2 whitespace-normal">{t.title}</span>
+                </div>
               </TableCell>
               <TableCell className="px-6 py-4">
                 <Badge variant={isIncome ? "default" : "destructive"}>
@@ -128,7 +149,7 @@ export function TransactionListTable({
                 </span>
               </TableCell>
               <TableCell className="px-6 py-4 text-right">
-                <div className="flex flex-wrap items-center justify-end gap-1">
+                <div className="flex flex-wrap items-center justify-end gap-1 opacity-80 transition-opacity group-hover:opacity-100">
                   <Button
                     type="button"
                     variant="ghost"

@@ -9,6 +9,7 @@ import { DashboardPage } from "@/pages/dashboard-page"
 import { DadosPage } from "@/pages/dados-page"
 import { MovimentacoesPage } from "@/pages/movimentacoes-page"
 import { ParceladasPage } from "@/pages/parceladas-page"
+import { RelatoriosPage } from "@/pages/relatorios-page"
 import { RecorrenciasPage } from "@/pages/recorrencias-page"
 
 export function AppRoutes() {
@@ -17,6 +18,7 @@ export function AppRoutes() {
       <Route path={ROUTES.home} element={<AppShell />}>
         <Route index element={<Navigate to={ROUTES.dashboard} replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="relatorios" element={<RelatoriosPage />} />
         <Route path="categorias" element={<CategoriasPage />} />
         <Route path="contas" element={<ContasPage />} />
         <Route path="cartoes" element={<CartoesPage />} />

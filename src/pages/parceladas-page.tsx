@@ -181,26 +181,29 @@ export function ParceladasPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-            Parcelamentos
-          </h1>
-          <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Visualize como no app do banco: deslize entre os planos, acompanhe o
-            que falta pagar e registre cada parcela no cartão ou na conta.
-          </p>
+      <div className="relative overflow-hidden rounded-2xl border bg-card p-6 md:p-8">
+        <div className="from-primary/15 absolute inset-x-0 top-0 h-full bg-gradient-to-r via-transparent to-transparent" />
+        <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+              Parcelamentos
+            </h1>
+            <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+              Visualize como no app do banco: deslize entre os planos, acompanhe o
+              que falta pagar e registre cada parcela no cartão ou na conta.
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="lg"
+            className="font-semibold shrink-0 self-start md:self-auto"
+            disabled={!hasCategories || !hasAccounts}
+            onClick={openCreate}
+          >
+            <PlusIcon data-icon="inline-start" />
+            Novo parcelamento
+          </Button>
         </div>
-        <Button
-          type="button"
-          size="lg"
-          className="font-semibold shrink-0 self-start md:self-auto"
-          disabled={!hasCategories || !hasAccounts}
-          onClick={openCreate}
-        >
-          <PlusIcon data-icon="inline-start" />
-          Novo parcelamento
-        </Button>
       </div>
 
       {!hasCategories ? (

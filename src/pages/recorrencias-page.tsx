@@ -1,4 +1,11 @@
-import { ArrowDownIcon, ArrowUpIcon, PlusIcon, RepeatIcon, TagsIcon } from "lucide-react"
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  PlusIcon,
+  RepeatIcon,
+  ScaleIcon,
+  TagsIcon,
+} from "lucide-react"
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { toast } from "sonner"
@@ -85,6 +92,7 @@ export function RecorrenciasPage() {
       activeExpenseAmount,
     }
   }, [rules])
+  const forecastBalance = stats.activeIncomeAmount - stats.activeExpenseAmount
 
   const openCreate = () => {
     setRuleToEdit(null)
@@ -124,26 +132,29 @@ export function RecorrenciasPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-            Recorrências
-          </h1>
-          <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Cadastre receitas e despesas que se repetem. Quando quiser registrar
-            de fato nas movimentações, use o botão “Lançar”.
-          </p>
+      <div className="relative overflow-hidden rounded-2xl border bg-card p-6 md:p-8">
+        <div className="from-primary/15 absolute inset-x-0 top-0 h-full bg-gradient-to-r via-transparent to-transparent" />
+        <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+              Recorrências
+            </h1>
+            <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+              Cadastre receitas e despesas que se repetem. Quando quiser registrar
+              de fato nas movimentações, use o botão “Lançar”.
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="lg"
+            className="font-semibold shrink-0 self-start md:self-auto"
+            disabled={!hasCategories}
+            onClick={openCreate}
+          >
+            <PlusIcon data-icon="inline-start" />
+            Nova recorrência
+          </Button>
         </div>
-        <Button
-          type="button"
-          size="lg"
-          className="font-semibold shrink-0 self-start md:self-auto"
-          disabled={!hasCategories}
-          onClick={openCreate}
-        >
-          <PlusIcon data-icon="inline-start" />
-          Nova recorrência
-        </Button>
       </div>
 
       <PageIntro
@@ -169,7 +180,7 @@ export function RecorrenciasPage() {
       ) : null}
 
       {hasCategories && stats.total > 0 ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="bg-card rounded-xl border p-6">
             <div className="mb-4 flex items-start justify-between">
               <div className="rounded-lg bg-emerald-500/15 p-2">
@@ -194,6 +205,25 @@ export function RecorrenciasPage() {
             </p>
             <h3 className="mt-1 font-heading text-2xl font-bold tabular-nums tracking-tight text-destructive">
               {formatCurrencyBRL(stats.activeExpenseAmount)}
+            </h3>
+          </div>
+          <div className="bg-card rounded-xl border p-6">
+            <div className="mb-4 flex items-start justify-between">
+              <div className="rounded-lg bg-primary/15 p-2">
+                <ScaleIcon className="size-5 text-primary" />
+              </div>
+            </div>
+            <p className="text-muted-foreground text-sm font-medium">Saldo previsto</p>
+            <h3
+              className={`mt-1 font-heading text-2xl font-bold tabular-nums tracking-tight ${
+                forecastBalance > 0
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : forecastBalance < 0
+                    ? "text-destructive"
+                    : "text-muted-foreground"
+              }`}
+            >
+              {formatCurrencyBRL(forecastBalance)}
             </h3>
           </div>
         </div>

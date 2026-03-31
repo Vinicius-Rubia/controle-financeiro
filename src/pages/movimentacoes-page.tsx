@@ -147,32 +147,35 @@ export function MovimentacoesPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+    <div className="flex flex-col gap-6 lg:gap-8">
+      <div className="relative overflow-hidden rounded-2xl border bg-card p-6 md:p-8">
+        <div className="from-primary/15 absolute inset-x-0 top-0 h-full bg-gradient-to-r via-transparent to-transparent" />
+        <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="font-heading text-3xl font-extrabold tracking-tight">
             Entradas e saídas
-          </h1>
-          <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Registre receitas e despesas por categoria, filtre por período e
-            acompanhe totais no mesmo padrão do painel de relatórios.
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-col gap-2 self-start sm:flex-row sm:items-center md:self-auto">
-          <AccountTransferToolbarButton
-            enabled={checkingAccounts.length >= 2}
-            onPress={() => setTransferOpen(true)}
-          />
-          <Button
-            type="button"
-            size="lg"
-            className="font-semibold"
-            disabled={!hasCategories || !hasAccounts}
-            onClick={openCreate}
-          >
-            <PlusIcon data-icon="inline-start" />
-            Novo lançamento
-          </Button>
+            </h1>
+            <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+              Gerencie seu extrato com uma visão clara das entradas, saídas e
+              saldo líquido do período filtrado.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col gap-2 self-start sm:flex-row sm:items-center md:self-auto">
+            <AccountTransferToolbarButton
+              enabled={checkingAccounts.length >= 2}
+              onPress={() => setTransferOpen(true)}
+            />
+            <Button
+              type="button"
+              size="lg"
+              className="font-semibold"
+              disabled={!hasCategories || !hasAccounts}
+              onClick={openCreate}
+            >
+              <PlusIcon data-icon="inline-start" />
+              Novo lançamento
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -185,8 +188,8 @@ export function MovimentacoesPage() {
               <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <span>
                   Para criar lançamentos, é necessário ter ao menos uma categoria.
-                  Ela deve ser compatível com o tipo de movimento (entrada, saída ou
-                  ambos).
+                  Ela deve ser compatível com o tipo de movimento (entrada, saída
+                  ou ambos).
                 </span>
               </AlertDescription>
             </div>
@@ -221,7 +224,7 @@ export function MovimentacoesPage() {
       {hasCategories && hasAccounts ? (
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="bg-card rounded-xl border p-6">
+            <div className="from-emerald-500/[0.11] to-card rounded-2xl border bg-gradient-to-b p-6 shadow-sm">
               <div className="mb-4 flex items-start justify-between">
                 <div className="rounded-lg bg-emerald-500/15 p-2">
                   <ArrowUpRightIcon className="size-5 text-emerald-500" />
@@ -238,7 +241,7 @@ export function MovimentacoesPage() {
               </h3>
             </div>
 
-            <div className="bg-card rounded-xl border p-6">
+            <div className="from-destructive/10 to-card rounded-2xl border bg-gradient-to-b p-6 shadow-sm">
               <div className="mb-4 flex items-start justify-between">
                 <div className="rounded-lg bg-destructive/15 p-2">
                   <ArrowDownLeftIcon className="text-destructive size-5" />
@@ -255,7 +258,7 @@ export function MovimentacoesPage() {
               </h3>
             </div>
 
-            <div className="bg-card rounded-xl border p-6">
+            <div className="from-primary/10 to-card rounded-2xl border bg-gradient-to-b p-6 shadow-sm">
               <div className="mb-4 flex items-start justify-between">
                 <div className="bg-primary/10 rounded-lg p-2">
                   <WalletIcon className="text-primary size-5" />
@@ -277,7 +280,7 @@ export function MovimentacoesPage() {
               </h3>
             </div>
 
-            <div className="bg-card rounded-xl border p-6">
+            <div className="from-muted/60 to-card rounded-2xl border bg-gradient-to-b p-6 shadow-sm">
               <div className="mb-4 flex items-start justify-between">
                 <div className="bg-muted rounded-lg p-2">
                   <ListIcon className="text-muted-foreground size-5" />
@@ -354,10 +357,10 @@ export function MovimentacoesPage() {
       ) : null}
 
       {hasCategories && hasAccounts && filteredTransactions.length > 0 ? (
-        <div className="bg-card overflow-hidden rounded-xl border">
+        <div className="bg-card overflow-hidden rounded-2xl border shadow-sm">
           <div className="bg-muted/30 border-b px-6 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h4 className="font-heading font-bold">Lista de lançamentos</h4>
+              <h4 className="font-heading font-bold">Extrato de lançamentos</h4>
               <div className="flex flex-wrap items-center gap-3">
                 {filtersActive ? (
                   <span className="text-muted-foreground text-xs font-medium">

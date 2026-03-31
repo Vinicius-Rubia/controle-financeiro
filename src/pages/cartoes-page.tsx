@@ -82,14 +82,17 @@ export function CartoesPage() {
     <div className="flex flex-col gap-8">
       {!hasAccounts ? (
         <>
-          <div>
-            <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-              Cartões
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Cada cartão fica vinculado a uma conta para fechamento e pagamento
-              da fatura.
-            </p>
+          <div className="relative overflow-hidden rounded-2xl border bg-card p-6 md:p-8">
+            <div className="from-primary/15 absolute inset-x-0 top-0 h-full bg-gradient-to-r via-transparent to-transparent" />
+            <div className="relative">
+              <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+                Cartões
+              </h1>
+              <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+                Cada cartão fica vinculado a uma conta para fechamento e pagamento
+                da fatura.
+              </p>
+            </div>
           </div>
           <Empty className="border border-dashed bg-muted/20">
             <EmptyHeader>
@@ -112,13 +115,16 @@ export function CartoesPage() {
         </>
       ) : !hasCards ? (
         <>
-          <div>
-            <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-              Cartões
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Cadastre cartões para vincular aos seus lançamentos.
-            </p>
+          <div className="relative overflow-hidden rounded-2xl border bg-card p-6 md:p-8">
+            <div className="from-primary/15 absolute inset-x-0 top-0 h-full bg-gradient-to-r via-transparent to-transparent" />
+            <div className="relative">
+              <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+                Cartões
+              </h1>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Cadastre cartões para vincular aos seus lançamentos.
+              </p>
+            </div>
           </div>
           <Empty className="border border-dashed bg-muted/20">
             <EmptyHeader>
@@ -140,20 +146,28 @@ export function CartoesPage() {
         </>
       ) : (
         <>
-          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-                Cartões
-              </h1>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Visualize como na carteira do banco: toque no cartão para abrir a
-                fatura e ver cada lançamento.
-              </p>
+          <div className="relative overflow-hidden rounded-2xl border bg-card p-6 md:p-8">
+            <div className="from-primary/15 absolute inset-x-0 top-0 h-full bg-gradient-to-r via-transparent to-transparent" />
+            <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+                  Cartões
+                </h1>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  Visualize como na carteira do banco: toque no cartão para abrir
+                  a fatura e ver cada lançamento.
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="lg"
+                className="font-semibold"
+                onClick={openCreate}
+              >
+                <PlusIcon data-icon="inline-start" />
+                Novo cartão
+              </Button>
             </div>
-            <Button type="button" size="lg" className="font-semibold" onClick={openCreate}>
-              <PlusIcon data-icon="inline-start" />
-              Novo cartão
-            </Button>
           </div>
 
           <CardWalletView

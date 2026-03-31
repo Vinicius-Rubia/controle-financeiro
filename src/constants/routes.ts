@@ -1,6 +1,7 @@
 export const ROUTES = {
   home: "/",
   dashboard: "/dashboard",
+  relatorios: "/relatorios",
   categorias: "/categorias",
   contas: "/contas",
   cartoes: "/cartoes",

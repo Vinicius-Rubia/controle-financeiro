@@ -260,22 +260,25 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-            Relatórios financeiros
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Análise do seu fluxo de caixa com base nos lançamentos (dados
-            locais).
-          </p>
+      <div className="relative overflow-hidden rounded-2xl border bg-card p-6 md:p-8">
+        <div className="from-primary/15 absolute inset-x-0 top-0 h-full bg-gradient-to-r via-transparent to-transparent" />
+        <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+              Relatórios financeiros
+            </h1>
+            <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+              Análise do seu fluxo de caixa com base nos lançamentos (dados
+              locais).
+            </p>
+          </div>
+          <Button size="lg" className="font-semibold" asChild>
+            <Link to={ROUTES.movimentacoes}>
+              <Plus data-icon="inline-start" />
+              Novo lançamento
+            </Link>
+          </Button>
         </div>
-        <Button size="lg" className="font-semibold" asChild>
-          <Link to={ROUTES.movimentacoes}>
-            <Plus data-icon="inline-start" />
-            Novo lançamento
-          </Link>
-        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">

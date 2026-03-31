@@ -103,14 +103,17 @@ export function ContasPage() {
     <div className="flex flex-col gap-8">
       {!hasAccounts ? (
         <>
-          <div>
-            <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-              Contas
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Cadastre contas correntes, poupança ou dinheiro em espécie para
-              vincular movimentações imediatas (Pix, espécie, liquidações).
-            </p>
+          <div className="relative overflow-hidden rounded-2xl border bg-card p-6 md:p-8">
+            <div className="from-primary/15 absolute inset-x-0 top-0 h-full bg-gradient-to-r via-transparent to-transparent" />
+            <div className="relative">
+              <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+                Contas
+              </h1>
+              <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+                Cadastre contas correntes, poupança ou dinheiro em espécie para
+                vincular movimentações imediatas (Pix, espécie, liquidações).
+              </p>
+            </div>
           </div>
           <Empty className="border border-dashed bg-muted/20">
             <EmptyHeader>
@@ -133,31 +136,34 @@ export function ContasPage() {
         </>
       ) : (
         <>
-          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-                Contas
-              </h1>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Visualize como no app do banco: deslize entre as contas, toque
-                para ver o extrato no caixa e use o menu para editar ou excluir.
-                Transferências entre contas correntes ficam no botão ao lado.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <AccountTransferToolbarButton
-                enabled={checkingAccounts.length >= 2}
-                onPress={() => setTransferOpen(true)}
-              />
-              <Button
-                type="button"
-                size="lg"
-                className="font-semibold"
-                onClick={openCreate}
-              >
-                <PlusIcon data-icon="inline-start" />
-                Nova conta
-              </Button>
+          <div className="relative overflow-hidden rounded-2xl border bg-card p-6 md:p-8">
+            <div className="from-primary/15 absolute inset-x-0 top-0 h-full bg-gradient-to-r via-transparent to-transparent" />
+            <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+                  Contas
+                </h1>
+                <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+                  Visualize como no app do banco: deslize entre as contas, toque
+                  para ver o extrato no caixa e use o menu para editar ou excluir.
+                  Transferências entre contas correntes ficam no botão ao lado.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <AccountTransferToolbarButton
+                  enabled={checkingAccounts.length >= 2}
+                  onPress={() => setTransferOpen(true)}
+                />
+                <Button
+                  type="button"
+                  size="lg"
+                  className="font-semibold"
+                  onClick={openCreate}
+                >
+                  <PlusIcon data-icon="inline-start" />
+                  Nova conta
+                </Button>
+              </div>
             </div>
           </div>
 

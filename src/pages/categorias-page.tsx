@@ -1,7 +1,6 @@
 import {
   ArrowDownLeftIcon,
   ArrowUpRightIcon,
-  LayersIcon,
   PlusIcon,
   TagsIcon,
 } from "lucide-react"
@@ -46,13 +45,11 @@ export function CategoriasPage() {
   const typeCounts = useMemo(() => {
     let income = 0
     let expense = 0
-    let both = 0
     for (const c of categories) {
       if (c.type === "income") income += 1
-      else if (c.type === "expense") expense += 1
-      else both += 1
+      else expense += 1
     }
-    return { income, expense, both, total: categories.length }
+    return { income, expense, total: categories.length }
   }, [categories])
 
   const deleteTransactionCount = deleteTarget
@@ -84,14 +81,17 @@ export function CategoriasPage() {
     <div className="flex flex-col gap-8">
       {!hasCategories ? (
         <>
-          <div>
-            <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-              Categorias
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Organize receitas e despesas. Cada nome deve ser único para o
-              mesmo tipo (receita, despesa ou ambos).
-            </p>
+          <div className="relative overflow-hidden rounded-2xl border bg-card p-6 md:p-8">
+            <div className="from-primary/15 absolute inset-x-0 top-0 h-full bg-gradient-to-r via-transparent to-transparent" />
+            <div className="relative">
+              <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+                Categorias
+              </h1>
+              <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+                Organize receitas e despesas. Cada nome deve ser único para o
+                mesmo tipo (receita ou despesa).
+              </p>
+            </div>
           </div>
           <Empty className="border border-dashed bg-muted/20">
             <EmptyHeader>
@@ -101,8 +101,7 @@ export function CategoriasPage() {
               <EmptyTitle>Nenhuma categoria ainda</EmptyTitle>
               <EmptyDescription>
                 Crie categorias para classificar seus lançamentos. Você pode
-                definir se cada uma vale só para receita, só para despesa ou
-                para ambos.
+                definir se cada uma vale só para receita ou só para despesa.
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
@@ -115,28 +114,31 @@ export function CategoriasPage() {
         </>
       ) : (
         <>
-          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h1 className="font-heading text-3xl font-extrabold tracking-tight">
-                Categorias
-              </h1>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Classifique lançamentos por tipo (dados locais). Nomes únicos por
-                combinação de escopo.
-              </p>
+          <div className="relative overflow-hidden rounded-2xl border bg-card p-6 md:p-8">
+            <div className="from-primary/15 absolute inset-x-0 top-0 h-full bg-gradient-to-r via-transparent to-transparent" />
+            <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h1 className="font-heading text-3xl font-extrabold tracking-tight">
+                  Categorias
+                </h1>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  Classifique lançamentos por tipo (dados locais). Nomes únicos por
+                  combinação de escopo.
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="lg"
+                className="font-semibold"
+                onClick={openCreate}
+              >
+                <PlusIcon data-icon="inline-start" />
+                Nova categoria
+              </Button>
             </div>
-            <Button
-              type="button"
-              size="lg"
-              className="font-semibold"
-              onClick={openCreate}
-            >
-              <PlusIcon data-icon="inline-start" />
-              Nova categoria
-            </Button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="bg-card rounded-xl border p-6">
               <div className="mb-4 flex items-start justify-between">
                 <div className="bg-primary/10 rounded-lg p-2">
@@ -198,27 +200,6 @@ export function CategoriasPage() {
               </h3>
             </div>
 
-            <div className="bg-card rounded-xl border p-6">
-              <div className="mb-4 flex items-start justify-between">
-                <div className="bg-muted rounded-lg p-2">
-                  <LayersIcon className="text-muted-foreground size-5" />
-                </div>
-                <span className="text-muted-foreground px-2 py-0.5 text-xs">
-                  Ambos
-                </span>
-              </div>
-              <p className="text-muted-foreground text-sm font-medium">
-                Receita e despesa
-              </p>
-              <h3
-                className={cn(
-                  "mt-1 font-heading text-2xl font-bold tabular-nums tracking-tight",
-                  typeCounts.both === 0 && "text-muted-foreground"
-                )}
-              >
-                {typeCounts.both}
-              </h3>
-            </div>
           </div>
 
           <div className="hidden md:block">

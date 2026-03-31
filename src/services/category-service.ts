@@ -5,7 +5,6 @@ export function categoryAcceptsTransactionType(
   category: Category,
   txType: TransactionType
 ): boolean {
-  if (category.type === "both") return true
   return category.type === txType
 }
 

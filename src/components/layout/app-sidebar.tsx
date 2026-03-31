@@ -8,6 +8,7 @@ import {
   HandCoins,
   Landmark,
   LayoutDashboard,
+  LineChart,
   Repeat,
   Tags,
 } from "lucide-react"
@@ -28,6 +29,7 @@ import {
 
 const NAV = [
   { to: ROUTES.dashboard, label: "Dashboard", icon: LayoutDashboard },
+  { to: ROUTES.relatorios, label: "Relatórios", icon: LineChart },
   { to: ROUTES.categorias, label: "Categorias", icon: Tags },
   { to: ROUTES.contas, label: "Contas", icon: Landmark },
   { to: ROUTES.cartoes, label: "Cartões", icon: CreditCard },

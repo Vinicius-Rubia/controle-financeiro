@@ -140,8 +140,8 @@ export function TransactionFilters({
                 <ToggleGroupItem value="cash_only">Só caixa</ToggleGroupItem>
               </ToggleGroup>
               <div className="text-muted-foreground text-xs">
-                Só caixa: movimentação imediata na conta (Pix, débito, dinheiro,
-                boleto e pagamento de fatura — sem compra no crédito).
+                Só caixa: lançamentos que alteram o saldo da conta na data do
+                registro (exclui compra no cartão de crédito).
               </div>
             </Field>
 

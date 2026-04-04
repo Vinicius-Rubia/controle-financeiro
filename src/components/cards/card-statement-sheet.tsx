@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom"
+import { BanknoteIcon } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
+import { CardPayStatementDialog } from "@/components/cards/card-pay-statement-dialog"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
@@ -27,9 +29,10 @@ import {
   transactionCategoryDisplay,
 } from "@/lib/transaction-ui"
 import { cn } from "@/lib/utils"
+import type { Account } from "@/types/account"
 import type { Card as CardModel } from "@/types/card"
 import type { InstallmentPlan } from "@/types/installment"
-import type { Transaction } from "@/types/transaction"
+import type { CreateTransactionInput, Transaction } from "@/types/transaction"
 
 function cycleShortLabel(closingIso: string): string {
   const parts = closingIso.split("-").map(Number)
@@ -52,6 +55,8 @@ export function CardStatementSheet({
   transactions,
   installmentPlans,
   categoryNameById,
+  accounts,
+  onPayStatement,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -59,6 +64,8 @@ export function CardStatementSheet({
   transactions: Transaction[]
   installmentPlans: InstallmentPlan[]
   categoryNameById: Map<string, string>
+  accounts: Account[]
+  onPayStatement: (input: CreateTransactionInput) => void
 }) {
   const todayIso = todayISODate()
   const cyclesChrono = useMemo(
@@ -72,12 +79,17 @@ export function CardStatementSheet({
   )
 
   const [selectedClosing, setSelectedClosing] = useState<string>("")
+  const [payOpen, setPayOpen] = useState(false)
 
   useEffect(() => {
     if (!open || !card) return
     const current = currentOpenStatementClosingIso(todayIso, card.closingDay)
     setSelectedClosing(current)
   }, [open, card?.id, card?.closingDay, todayIso])
+
+  useEffect(() => {
+    if (!open) setPayOpen(false)
+  }, [open])
 
   const reserved = card
     ? creditReservedForCard(installmentPlans, card.id)
@@ -117,6 +129,7 @@ export function CardStatementSheet({
       : 0
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex w-full max-w-full flex-col gap-0 p-0 sm:max-w-md md:max-w-lg">
         <SheetHeader className="space-y-1 border-b px-6 py-4 text-left">
@@ -124,8 +137,8 @@ export function CardStatementSheet({
             {card ? card.name : "Fatura"}
           </SheetTitle>
           <SheetDescription>
-            Fatura por ciclo de fechamento. Para registrar o pagamento, use o
-            meio &quot;Pagamento de fatura&quot; em movimentações.
+            Fatura por ciclo de fechamento. Use o botão abaixo para registrar o
+            pagamento na conta vinculada ao cartão.
           </SheetDescription>
         </SheetHeader>
 
@@ -240,6 +253,18 @@ export function CardStatementSheet({
                   </p>
                 </div>
               </div>
+
+              {summary.outstanding > 0 ? (
+                <Button
+                  type="button"
+                  className="w-full"
+                  size="lg"
+                  onClick={() => setPayOpen(true)}
+                >
+                  <BanknoteIcon data-icon="inline-start" />
+                  Pagar fatura
+                </Button>
+              ) : null}
             </div>
           ) : null}
 
@@ -337,13 +362,24 @@ export function CardStatementSheet({
         </div>
 
         <div className="mt-auto border-t p-4">
-          <Button asChild className="w-full" size="lg">
+          <Button asChild variant="outline" className="w-full" size="lg">
             <Link to={ROUTES.movimentacoes} onClick={() => onOpenChange(false)}>
-              Ir para movimentações
+              Ver entradas e saídas
             </Link>
           </Button>
         </div>
       </SheetContent>
     </Sheet>
+
+    <CardPayStatementDialog
+      open={payOpen}
+      onOpenChange={setPayOpen}
+      card={card}
+      closingIso={selectedClosing}
+      transactions={transactions}
+      accounts={accounts}
+      onConfirm={onPayStatement}
+    />
+    </>
   )
 }

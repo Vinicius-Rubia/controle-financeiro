@@ -44,6 +44,7 @@ import { firstActiveAccountId } from "@/lib/account-ui"
 import {
   formatCurrencyInputBRFromNumber,
   maskCurrencyInputBR,
+  moneyToCents,
   parseCurrencyInputBR,
 } from "@/lib/currency-input"
 import { statementSummariesForCard } from "@/lib/credit-statement"
@@ -176,6 +177,8 @@ export function TransactionFormDialog({
   onUpdate: (input: UpdateTransactionInput) => Transaction | null
 }) {
   const isEdit = transactionToEdit !== null
+  const isEditingSettlement =
+    isEdit && transactionToEdit?.paymentMethod === "credit_card_settlement"
 
   const [dateOpen, setDateOpen] = useState(false)
 
@@ -370,7 +373,7 @@ export function TransactionFormDialog({
     if (
       values.paymentMethod === "credit_card_settlement" &&
       selectedSettlementOutstanding !== null &&
-      amount > selectedSettlementOutstanding
+      moneyToCents(amount) > moneyToCents(selectedSettlementOutstanding)
     ) {
       form.setError("amount", {
         message: `Valor acima do em aberto (${formatCurrencyBRL(selectedSettlementOutstanding)}).`,
@@ -592,40 +595,46 @@ export function TransactionFormDialog({
               }
             >
               <FieldLabel htmlFor="tx-payment">Meio de pagamento</FieldLabel>
-              <Controller
-                name="paymentMethod"
-                control={form.control}
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger
-                      id="tx-payment"
-                      className="w-full min-w-0"
-                      aria-invalid={!!form.formState.errors.paymentMethod}
+              {isEditingSettlement ? (
+                <Input
+                  id="tx-payment"
+                  readOnly
+                  className="bg-muted"
+                  value="Pagamento de fatura"
+                />
+              ) : (
+                <Controller
+                  name="paymentMethod"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
                     >
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="pix">Pix</SelectItem>
-                        <SelectItem value="debit_card">
-                          Cartão de débito
-                        </SelectItem>
-                        <SelectItem value="credit_card">
-                          Cartão de crédito
-                        </SelectItem>
-                        <SelectItem value="boleto">Boleto</SelectItem>
-                        <SelectItem value="cash">Dinheiro</SelectItem>
-                        <SelectItem value="credit_card_settlement">
-                          Pagamento de fatura
-                        </SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
+                      <SelectTrigger
+                        id="tx-payment"
+                        className="w-full min-w-0"
+                        aria-invalid={!!form.formState.errors.paymentMethod}
+                      >
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="pix">Pix</SelectItem>
+                          <SelectItem value="debit_card">
+                            Cartão de débito
+                          </SelectItem>
+                          <SelectItem value="credit_card">
+                            Cartão de crédito
+                          </SelectItem>
+                          <SelectItem value="boleto">Boleto</SelectItem>
+                          <SelectItem value="cash">Dinheiro</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              )}
               <FieldError
                 errors={[form.formState.errors.paymentMethod]}
               />
@@ -664,9 +673,8 @@ export function TransactionFormDialog({
                 )}
               />
               <FieldDescription className="text-xs">
-                Obrigatória em todo lançamento. No crédito, o caixa só muda no
-                pagamento da fatura. Em “Pagamento de fatura”, categoria não se
-                aplica.
+                Obrigatória em todo lançamento. Compras no cartão de crédito não
+                alteram o saldo da conta até você quitar a fatura em Cartões.
               </FieldDescription>
               <FieldError errors={[form.formState.errors.accountId]} />
             </Field>

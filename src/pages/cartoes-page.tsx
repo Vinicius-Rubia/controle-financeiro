@@ -22,13 +22,17 @@ import { useCards } from "@/hooks/use-cards"
 import { useCategories } from "@/hooks/use-categories"
 import { useInstallmentPlans } from "@/hooks/use-installment-plans"
 import { useTransactions } from "@/hooks/use-transactions"
+import { formatCurrencyBRL } from "@/lib/format-currency"
+import { totalCreditOutstanding } from "@/lib/credit-statement"
+import { cn } from "@/lib/utils"
 import type { Card } from "@/types/card"
+import type { CreateTransactionInput } from "@/types/transaction"
 
 export function CartoesPage() {
   const { accounts } = useAccounts()
   const { categories } = useCategories()
   const { cards, create, update, remove, getById } = useCards()
-  const { transactions } = useTransactions()
+  const { transactions, create: createTransactionMovement } = useTransactions()
   const { plans } = useInstallmentPlans()
 
   const [formOpen, setFormOpen] = useState(false)
@@ -43,6 +47,14 @@ export function CartoesPage() {
       ),
     [cards]
   )
+
+  const totalFaturasEmAberto = useMemo(() => {
+    let sum = 0
+    for (const c of sortedCards) {
+      sum += totalCreditOutstanding(transactions, c)
+    }
+    return sum
+  }, [sortedCards, transactions])
 
   const accountNameById = useMemo(() => {
     const m = new Map<string, string>()
@@ -64,6 +76,20 @@ export function CartoesPage() {
   const openEdit = (card: Card) => {
     setCardToEdit(getById(card.id) ?? card)
     setFormOpen(true)
+  }
+
+  const payStatement = (input: CreateTransactionInput) => {
+    try {
+      createTransactionMovement(input)
+      toast.success("Pagamento da fatura registrado.")
+    } catch (e) {
+      toast.error(
+        e instanceof Error
+          ? e.message
+          : "Não foi possível registrar o pagamento."
+      )
+      throw e
+    }
   }
 
   const confirmDelete = () => {
@@ -170,6 +196,25 @@ export function CartoesPage() {
             </div>
           </div>
 
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+              Total em faturas
+            </p>
+            <p
+              className={cn(
+                "font-heading mt-1 text-3xl font-bold tabular-nums tracking-tight",
+                totalFaturasEmAberto > 0 && "text-destructive",
+                totalFaturasEmAberto === 0 && "text-muted-foreground"
+              )}
+            >
+              {formatCurrencyBRL(totalFaturasEmAberto)}
+            </p>
+            <p className="text-muted-foreground mt-3 text-xs">
+              Soma do valor em aberto em todos os ciclos de fechamento dos cartões
+              listados.
+            </p>
+          </div>
+
           <CardWalletView
             cards={sortedCards}
             transactions={transactions}
@@ -213,6 +258,8 @@ export function CartoesPage() {
         transactions={transactions}
         installmentPlans={plans}
         categoryNameById={categoryNameById}
+        accounts={accounts}
+        onPayStatement={payStatement}
       />
     </div>
   )

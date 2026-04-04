@@ -25,3 +25,9 @@ export function formatCurrencyInputBRFromNumber(value: number): string {
     maximumFractionDigits: 2,
   })
 }
+
+/** Centavos inteiros — comparações seguras após somatórios em float. */
+export function moneyToCents(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.round(value * 100)
+}

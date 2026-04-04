@@ -6,8 +6,9 @@ import {
 } from "@/lib/credit-statement"
 import type { Card } from "@/types/card"
 import type { InstallmentPlan } from "@/types/installment"
+import type { PlannedPayment } from "@/types/planned-payment"
 import type { RecurringRule } from "@/types/recurring"
-import type { Transaction } from "@/types/transaction"
+import type { PaymentMethod, Transaction } from "@/types/transaction"
 
 export interface DashboardTotals {
   totalIncome: number
@@ -295,21 +296,6 @@ function parseIsoDateOnly(value: string | undefined): Date | null {
   return new Date(y, m - 1, d)
 }
 
-function previousMonthlyOccurrenceDate(
-  occurrence: Date,
-  dayOfMonth: number | undefined
-): Date {
-  const targetDay = dayOfMonth ?? occurrence.getDate()
-  let y = occurrence.getFullYear()
-  let m0 = occurrence.getMonth() - 1
-  if (m0 < 0) {
-    m0 = 11
-    y -= 1
-  }
-  const lastDay = new Date(y, m0 + 1, 0).getDate()
-  return new Date(y, m0, Math.min(targetDay, lastDay))
-}
-
 function launchedWithinOccurrenceCycle(
   launchedAt: Date,
   previousOccurrence: Date,
@@ -328,8 +314,16 @@ function recurringOccurrenceAlreadyLaunched(
   const occurrence = parseIsoDateOnly(occurrenceDateIso)
   if (!occurrence) return false
   if (rule.frequency === "monthly") {
-    const prev = previousMonthlyOccurrenceDate(occurrence, rule.dayOfMonth)
-    return launchedWithinOccurrenceCycle(lastPosted, prev, occurrence)
+    /**
+     * Conta como “já lançado” para esta ocorrência só se o último lançamento
+     * caiu no mesmo mês civil da data da ocorrência (ex.: ocorrência 15/04 só
+     * some se houve lançamento em abril). Evita que um pagamento atrasado no
+     * fim do mês anterior (ex. 31/03) encerre o ciclo do mês seguinte (15/04).
+     */
+    return (
+      lastPosted.getFullYear() === occurrence.getFullYear() &&
+      lastPosted.getMonth() === occurrence.getMonth()
+    )
   }
   const prev = addDays(occurrence, -7)
   return launchedWithinOccurrenceCycle(lastPosted, prev, occurrence)
@@ -437,5 +431,203 @@ export function computeUpcomingPendenciesNext7Days(
     if (a.date !== b.date) return a.date.localeCompare(b.date)
     if (a.type !== b.type) return a.type.localeCompare(b.type)
     return a.title.localeCompare(b.title)
+  })
+}
+
+export type MonthlyProjectionSource =
+  | "recurring"
+  | "installment"
+  | "credit_statement"
+  | "planned_payment"
+
+export interface MonthlyProjectionItem {
+  key: string
+  /** Data em que o efeito no caixa ou o vencimento da fatura ocorre (`YYYY-MM-DD`). */
+  dueDateIso: string
+  title: string
+  subtitle?: string
+  type: "income" | "expense"
+  amount: number
+  amountIsKnown: boolean
+  source: MonthlyProjectionSource
+  categoryId?: string
+  accountId?: string
+  cardId?: string
+  /** Conta usada para pagar fatura (quando aplicável). */
+  payFromAccountId?: string
+  paymentMethod?: PaymentMethod
+  statementClosingIso?: string
+  /** Data de competência no crédito (parcela / uso) quando o pagamento é na fatura. */
+  competenceIso?: string
+  installmentNumber?: number
+  installmentCount?: number
+}
+
+/**
+ * Itens previstos de entrada e saída para um mês civil: faturas em aberto com
+ * vencimento no mês, parcelas reservadas, recorrências ainda não lançadas e
+ * planejamentos do período.
+ */
+export function computeMonthlyProjection(input: {
+  year: number
+  month: number
+  transactions: Transaction[]
+  cards: Card[]
+  installmentPlans: InstallmentPlan[]
+  recurringRules: RecurringRule[]
+  plannedPayments: PlannedPayment[]
+}): MonthlyProjectionItem[] {
+  const {
+    year,
+    month,
+    transactions,
+    cards,
+    installmentPlans,
+    recurringRules,
+    plannedPayments,
+  } = input
+
+  const monthStart = new Date(year, month - 1, 1)
+  const monthEnd = new Date(year, month, 0)
+  const fromIso = toISODate(monthStart)
+  const toIso = toISODate(monthEnd)
+  const cardById = new Map(cards.map((c) => [c.id, c]))
+
+  const inSelectedMonth = (iso: string) => inRangeInclusive(iso, fromIso, toIso)
+
+  const rows: MonthlyProjectionItem[] = []
+
+  for (const card of cards) {
+    if (!card.active) continue
+    const summaries = statementSummariesForCard(transactions, card)
+    for (const summary of summaries) {
+      if (summary.outstanding <= 0) continue
+      if (!inSelectedMonth(summary.dueDateIso)) continue
+      rows.push({
+        key: `stmt:${card.id}:${summary.closingDateIso}`,
+        dueDateIso: summary.dueDateIso,
+        title: `Fatura — ${card.name}`,
+        type: "expense",
+        amount: summary.outstanding,
+        amountIsKnown: true,
+        source: "credit_statement",
+        payFromAccountId: card.accountId,
+        accountId: card.accountId,
+        cardId: card.id,
+        statementClosingIso: summary.closingDateIso,
+        paymentMethod: "credit_card_settlement",
+      })
+    }
+  }
+
+  for (const plan of installmentPlans) {
+    if (plan.status !== "active") continue
+    for (const inst of plan.installments) {
+      if (inst.status !== "reserved") continue
+      let dueDateIso: string
+      let competenceIso: string | undefined
+      if (plan.paymentMethod === "credit_card" && plan.cardId) {
+        const card = cardById.get(plan.cardId)
+        if (!card || !card.active) continue
+        dueDateIso = statementDueDateForCardPurchase(inst.dueDate, card)
+        competenceIso = inst.dueDate
+      } else {
+        dueDateIso = inst.dueDate
+      }
+      // No crédito, o pagamento na fatura (dueDateIso) pode cair no mês seguinte;
+      // o mês da lista segue o vencimento da parcela cadastrado.
+      const inMonth =
+        plan.paymentMethod === "credit_card" && plan.cardId
+          ? inSelectedMonth(inst.dueDate)
+          : inSelectedMonth(dueDateIso)
+      if (!inMonth) continue
+      rows.push({
+        key: `inst:${plan.id}:${inst.id}`,
+        dueDateIso,
+        title: plan.title,
+        subtitle: `Parcela ${inst.number}/${plan.installmentCount}`,
+        type: plan.type,
+        amount: inst.amount,
+        amountIsKnown: true,
+        source: "installment",
+        categoryId: plan.categoryId,
+        accountId: plan.accountId,
+        cardId: plan.cardId,
+        paymentMethod: plan.paymentMethod,
+        competenceIso,
+        installmentNumber: inst.number,
+        installmentCount: plan.installmentCount,
+      })
+    }
+  }
+
+  for (const rule of recurringRules) {
+    if (!rule.active) continue
+    const occurrenceDates = recurringDatesInRange(rule, monthStart, monthEnd)
+    for (const occurrenceDate of occurrenceDates) {
+      if (recurringOccurrenceAlreadyLaunched(rule, occurrenceDate)) continue
+      let dueDateIso: string
+      let competenceIso: string | undefined
+      if (rule.paymentMethod === "credit_card" && rule.cardId) {
+        const card = cardById.get(rule.cardId)
+        if (!card || !card.active) continue
+        dueDateIso = statementDueDateForCardPurchase(occurrenceDate, card)
+        competenceIso = occurrenceDate
+      } else {
+        dueDateIso = occurrenceDate
+      }
+      // Ocorrências já vêm só do mês selecionado; não filtrar pela data da fatura.
+      rows.push({
+        key: `rec:${rule.id}:${occurrenceDate}`,
+        dueDateIso,
+        title: rule.title,
+        subtitle:
+          rule.frequency === "monthly"
+            ? "Recorrência mensal"
+            : "Recorrência semanal",
+        type: rule.type,
+        amount: rule.amount,
+        amountIsKnown: true,
+        source: "recurring",
+        categoryId: rule.categoryId,
+        accountId: rule.accountId,
+        cardId: rule.cardId,
+        paymentMethod: rule.paymentMethod,
+        competenceIso,
+      })
+    }
+  }
+
+  for (const p of plannedPayments) {
+    if (p.targetYear !== year || p.targetMonth !== month) continue
+    const hasAmt = typeof p.estimatedAmount === "number"
+    rows.push({
+      key: `planpay:${p.id}`,
+      dueDateIso: `${year}-${pad2(month)}-15`,
+      title: p.title,
+      subtitle: "Planejamento (sem dia fixo)",
+      type: p.type,
+      amount: hasAmt ? p.estimatedAmount! : 0,
+      amountIsKnown: hasAmt,
+      source: "planned_payment",
+      categoryId: p.categoryId,
+    })
+  }
+
+  function projectionSortKey(r: MonthlyProjectionItem): string {
+    return r.competenceIso ?? r.dueDateIso
+  }
+
+  return rows.sort((a, b) => {
+    const ka = projectionSortKey(a)
+    const kb = projectionSortKey(b)
+    if (ka !== kb) {
+      return ka.localeCompare(kb)
+    }
+    if (a.type !== b.type) {
+      if (a.type === "expense" && b.type === "income") return -1
+      if (a.type === "income" && b.type === "expense") return 1
+    }
+    return a.title.localeCompare(b.title, "pt-BR", { sensitivity: "base" })
   })
 }

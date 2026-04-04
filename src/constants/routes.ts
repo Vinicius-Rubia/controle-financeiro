@@ -9,5 +9,6 @@ export const ROUTES = {
   planejamentos: "/planejamentos",
   movimentacoes: "/movimentacoes",
   recorrencias: "/recorrencias",
+  fluxoMensal: "/fluxo-mensal",
   dados: "/dados",
 } as const

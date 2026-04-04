@@ -1,6 +1,12 @@
 import type { Card } from "@/types/card"
 import type { Transaction } from "@/types/transaction"
 
+/** Saldo em aberto após somar vários lançamentos (evita 499,999… vs 500,00 no pagamento). */
+function roundBRL2(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.round(value * 100) / 100
+}
+
 export function daysInMonth(year: number, monthIndex0: number): number {
   return new Date(year, monthIndex0 + 1, 0).getDate()
 }
@@ -140,7 +146,7 @@ export function cycleOutstanding(
     closingDateIso
   )
   const paid = settlementsTotalForCycle(transactions, card.id, closingDateIso)
-  return Math.max(0, net - paid)
+  return roundBRL2(Math.max(0, net - paid))
 }
 
 export function listStatementClosingDatesForCard(
@@ -211,7 +217,7 @@ export function statementSummariesForCard(
         closingDateIso,
         netPurchases: net,
         paid,
-        outstanding: Math.max(0, net - paid),
+        outstanding: cycleOutstanding(transactions, card, closingDateIso),
         dueDateIso: dueDateForStatementClosing(closingDateIso, card.dueDay),
       }
     }
@@ -251,7 +257,7 @@ export function statementSummaryForClosing(
     closingDateIso,
     netPurchases: net,
     paid,
-    outstanding: Math.max(0, net - paid),
+    outstanding: cycleOutstanding(transactions, card, closingDateIso),
     dueDateIso: dueDateForStatementClosing(closingDateIso, card.dueDay),
   }
 }

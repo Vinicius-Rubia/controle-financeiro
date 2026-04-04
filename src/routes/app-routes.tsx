@@ -12,6 +12,7 @@ import { ParceladasPage } from "@/pages/parceladas-page"
 import { PlanejamentosPage } from "@/pages/planejamentos-page"
 import { RelatoriosPage } from "@/pages/relatorios-page"
 import { RecorrenciasPage } from "@/pages/recorrencias-page"
+import { FluxoMensalPage } from "@/pages/fluxo-mensal-page"
 
 export function AppRoutes() {
   return (
@@ -27,6 +28,7 @@ export function AppRoutes() {
         <Route path="planejamentos" element={<PlanejamentosPage />} />
         <Route path="movimentacoes" element={<MovimentacoesPage />} />
         <Route path="recorrencias" element={<RecorrenciasPage />} />
+        <Route path="fluxo-mensal" element={<FluxoMensalPage />} />
         <Route path="dados" element={<DadosPage />} />
       </Route>
       <Route path="*" element={<Navigate to={ROUTES.dashboard} replace />} />

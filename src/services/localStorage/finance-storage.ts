@@ -1,5 +1,6 @@
 import { accountNetBalanceThroughDate } from "@/lib/account-ui"
 import { cardSupportsPaymentMethod } from "@/lib/card-ui"
+import { moneyToCents } from "@/lib/currency-input"
 import { cycleOutstanding, totalCreditOutstanding } from "@/lib/credit-statement"
 import { todayISODate } from "@/lib/transaction-ui"
 import { categoryAcceptsTransactionType } from "@/services/category-service"
@@ -469,7 +470,7 @@ function assertSettlementTransaction(tx: {
     .list()
     .filter((item) => item.id !== tx.currentTransactionId)
   const outstanding = cycleOutstanding(baseTx, card, tx.statementPeriodKey)
-  if (tx.amount > outstanding) {
+  if (moneyToCents(tx.amount) > moneyToCents(outstanding)) {
     throw new Error("Valor do pagamento não pode exceder o saldo em aberto.")
   }
 }

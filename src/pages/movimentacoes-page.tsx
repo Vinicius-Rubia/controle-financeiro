@@ -209,8 +209,8 @@ export function MovimentacoesPage() {
             <EmptyTitle>Cadastre ao menos uma conta</EmptyTitle>
             <EmptyDescription>
               Todo lançamento exige uma conta. Pix, dinheiro e saídas imediatas
-              alteram o saldo na hora; no crédito, a mesma conta serve de
-              referência e para pagar a fatura.
+              alteram o saldo na hora; no crédito, a conta vinculada serve de
+              referência para o cartão.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

@@ -17,6 +17,11 @@ import type {
   RecurringRule,
 } from "@/types/recurring"
 import type { CreatePlannedPaymentInput, PlannedPayment } from "@/types/planned-payment"
+import type {
+  CreateSavingsGoalInput,
+  SavingsGoal,
+  SavingsGoalContribution,
+} from "@/types/savings-goal"
 import type { PaymentMethod, Transaction, TransactionType } from "@/types/transaction"
 
 function isNonEmptyString(v: unknown): v is string {
@@ -752,5 +757,97 @@ export function assertCreateInstallmentPlanInput(
   if (typeof o.walletAccentHex !== "string") return false
   if (!isValidWalletAccentHex(o.walletAccentHex)) return false
   if (o.autoPost !== undefined && typeof o.autoPost !== "boolean") return false
+  return true
+}
+
+function parseSavingsGoalContribution(
+  raw: unknown
+): SavingsGoalContribution | null {
+  if (!raw || typeof raw !== "object") return null
+  const o = raw as Record<string, unknown>
+  if (!isNonEmptyString(o.id)) return null
+  if (!isNonEmptyString(o.date)) return null
+  if (!isFiniteNumber(o.amount) || o.amount <= 0) return null
+  const noteRaw = typeof o.note === "string" ? o.note.trim() : ""
+  const note = noteRaw.length > 0 ? noteRaw.slice(0, 500) : undefined
+  const accountId =
+    typeof o.accountId === "string" && o.accountId.trim()
+      ? o.accountId.trim()
+      : undefined
+  const transactionId =
+    typeof o.transactionId === "string" && o.transactionId.trim()
+      ? o.transactionId.trim()
+      : undefined
+  return {
+    id: o.id.trim(),
+    date: o.date.trim(),
+    amount: o.amount,
+    ...(accountId ? { accountId } : {}),
+    ...(transactionId ? { transactionId } : {}),
+    ...(note ? { note } : {}),
+  }
+}
+
+export function parseSavingsGoal(raw: unknown): SavingsGoal | null {
+  if (!raw || typeof raw !== "object") return null
+  const o = raw as Record<string, unknown>
+  if (!isNonEmptyString(o.id)) return null
+  if (!isNonEmptyString(o.title)) return null
+  if (!isFiniteNumber(o.monthlyTargetAmount) || o.monthlyTargetAmount <= 0) {
+    return null
+  }
+  let targetTotalAmount: number | null = null
+  if (o.targetTotalAmount !== undefined && o.targetTotalAmount !== null) {
+    if (!isFiniteNumber(o.targetTotalAmount) || o.targetTotalAmount <= 0) {
+      return null
+    }
+    targetTotalAmount = o.targetTotalAmount
+  }
+  let targetDeadlineDate: string | null = null
+  if (typeof o.targetDeadlineDate === "string" && o.targetDeadlineDate.trim()) {
+    targetDeadlineDate = o.targetDeadlineDate.trim()
+  }
+  const contributions: SavingsGoalContribution[] = []
+  if (Array.isArray(o.contributions)) {
+    for (const c of o.contributions) {
+      const p = parseSavingsGoalContribution(c)
+      if (p) contributions.push(p)
+    }
+  }
+  const createdAt = isNonEmptyString(o.createdAt) ? o.createdAt.trim() : null
+  if (!createdAt) return null
+  let updatedAt = isNonEmptyString(o.updatedAt) ? o.updatedAt.trim() : null
+  if (!updatedAt) updatedAt = createdAt
+  return {
+    id: o.id.trim(),
+    title: o.title.trim(),
+    monthlyTargetAmount: o.monthlyTargetAmount,
+    targetTotalAmount,
+    targetDeadlineDate,
+    contributions,
+    createdAt,
+    updatedAt,
+  }
+}
+
+export function assertCreateSavingsGoalInput(
+  input: unknown
+): input is CreateSavingsGoalInput {
+  if (!input || typeof input !== "object") return false
+  const o = input as Record<string, unknown>
+  if (!isNonEmptyString(o.title)) return false
+  if (!isFiniteNumber(o.monthlyTargetAmount) || o.monthlyTargetAmount <= 0) {
+    return false
+  }
+  if (o.targetTotalAmount !== undefined && o.targetTotalAmount !== null) {
+    if (!isFiniteNumber(o.targetTotalAmount) || o.targetTotalAmount <= 0) {
+      return false
+    }
+  }
+  if (o.targetDeadlineDate !== undefined && o.targetDeadlineDate !== null) {
+    if (typeof o.targetDeadlineDate !== "string" || !o.targetDeadlineDate.trim()) {
+      return false
+    }
+  }
   return true
 }

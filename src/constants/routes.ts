@@ -10,5 +10,6 @@ export const ROUTES = {
   movimentacoes: "/movimentacoes",
   recorrencias: "/recorrencias",
   fluxoMensal: "/fluxo-mensal",
+  metas: "/metas",
   dados: "/dados",
 } as const

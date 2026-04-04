@@ -9,6 +9,7 @@ import {
   Database,
   HandCoins,
   Landmark,
+  PiggyBank,
   LayoutDashboard,
   LineChart,
   Repeat,
@@ -39,6 +40,7 @@ const NAV = [
   { to: ROUTES.recorrencias, label: "Recorrências", icon: Repeat },
   { to: ROUTES.planejamentos, label: "Planejamentos", icon: CalendarClock },
   { to: ROUTES.fluxoMensal, label: "Fluxo mensal", icon: CalendarRange },
+  { to: ROUTES.metas, label: "Metas (cofrinho)", icon: PiggyBank },
   { to: ROUTES.movimentacoes, label: "Entradas/Saídas", icon: ArrowDownUp },
   { to: ROUTES.dados, label: "Dados locais", icon: Database },
 ] as const

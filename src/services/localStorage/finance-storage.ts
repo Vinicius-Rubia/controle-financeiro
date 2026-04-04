@@ -32,6 +32,11 @@ import type {
   UpdatePlannedPaymentInput,
 } from "@/types/planned-payment"
 import type {
+  CreateSavingsGoalInput,
+  SavingsGoal,
+  UpdateSavingsGoalInput,
+} from "@/types/savings-goal"
+import type {
   CreateAccountTransferInput,
   CreateTransactionInput,
   PaymentMethod,
@@ -46,6 +51,7 @@ import {
   assertCreateInstallmentPlanInput,
   assertCreatePlannedPaymentInput,
   assertCreateRecurringRuleInput,
+  assertCreateSavingsGoalInput,
   assertCreateTransactionInput,
   parseAccount,
   parseCard,
@@ -53,6 +59,7 @@ import {
   parseInstallmentPlan,
   parsePlannedPayment,
   parseRecurringRule,
+  parseSavingsGoal,
   parseTransaction,
 } from "./entity-parsers"
 import {
@@ -269,6 +276,11 @@ const installmentPlansRepo = createLocalStorageRepository<InstallmentPlan>({
 const plannedPaymentsRepo = createLocalStorageRepository<PlannedPayment>({
   storageKey: STORAGE_KEYS.plannedPayments,
   parseItem: parsePlannedPayment,
+})
+
+const savingsGoalsRepo = createLocalStorageRepository<SavingsGoal>({
+  storageKey: STORAGE_KEYS.savingsGoals,
+  parseItem: parseSavingsGoal,
 })
 
 let categoriesLegacyMigrated = false
@@ -906,17 +918,12 @@ export function createAccountTransfer(
     transferGroupId: groupId,
   }
 
-  let outgoing: Transaction
-  try {
-    outgoing = createTransaction({
-      ...common,
-      title: outTitle,
-      type: "expense",
-      accountId: fromAcc.id,
-    })
-  } catch (e) {
-    throw e
-  }
+  const outgoing = createTransaction({
+    ...common,
+    title: outTitle,
+    type: "expense",
+    accountId: fromAcc.id,
+  })
   try {
     const incoming = createTransaction({
       ...common,
@@ -1331,6 +1338,189 @@ export function updatePlannedPayment(
 
 export function deletePlannedPayment(id: string): boolean {
   return plannedPaymentsRepo.remove(id)
+}
+
+// ——— Metas (cofrinho) ———
+
+const SAVINGS_GOAL_EXPENSE_CATEGORY_NAME = "Meta / cofrinho"
+
+function getOrCreateSavingsGoalExpenseCategoryId(): string {
+  migrateCategoriesFromLegacyOnce()
+  const want = SAVINGS_GOAL_EXPENSE_CATEGORY_NAME.toLowerCase()
+  for (const c of categoriesRepo.list()) {
+    if (c.type === "expense" && c.name.trim().toLowerCase() === want) {
+      return c.id
+    }
+  }
+  const now = new Date().toISOString()
+  const cat = categoriesRepo.create(() => ({
+    id: crypto.randomUUID(),
+    name: SAVINGS_GOAL_EXPENSE_CATEGORY_NAME,
+    type: "expense" as const,
+    createdAt: now,
+    updatedAt: now,
+  }))
+  return cat.id
+}
+
+export function listSavingsGoals(): SavingsGoal[] {
+  return savingsGoalsRepo.list()
+}
+
+export function getSavingsGoalById(id: string): SavingsGoal | undefined {
+  return savingsGoalsRepo.getById(id)
+}
+
+export function createSavingsGoal(input: CreateSavingsGoalInput): SavingsGoal {
+  if (!assertCreateSavingsGoalInput(input)) {
+    throw new Error("Dados da meta inválidos.")
+  }
+  const nowIso = new Date().toISOString()
+  const targetTotalAmount =
+    input.targetTotalAmount === undefined || input.targetTotalAmount === null
+      ? null
+      : input.targetTotalAmount
+  const targetDeadlineDate =
+    input.targetDeadlineDate === undefined || input.targetDeadlineDate === null
+      ? null
+      : String(input.targetDeadlineDate).trim() || null
+  return savingsGoalsRepo.create(() => ({
+    id: crypto.randomUUID(),
+    title: input.title.trim(),
+    monthlyTargetAmount: input.monthlyTargetAmount,
+    targetTotalAmount,
+    targetDeadlineDate,
+    contributions: [],
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  }))
+}
+
+export function updateSavingsGoal(
+  input: UpdateSavingsGoalInput
+): SavingsGoal | null {
+  const current = savingsGoalsRepo.getById(input.id)
+  if (!current) return null
+  const { id, ...rest } = input
+  const patch = omitUndefined(rest as Record<string, unknown>) as Partial<
+    Pick<
+      SavingsGoal,
+      "title" | "monthlyTargetAmount" | "targetTotalAmount" | "targetDeadlineDate"
+    >
+  >
+  const merged: SavingsGoal = { ...current, ...patch, id: current.id }
+
+  if (!merged.title.trim()) return null
+  if (
+    !Number.isFinite(merged.monthlyTargetAmount) ||
+    merged.monthlyTargetAmount <= 0
+  ) {
+    return null
+  }
+  if (merged.targetTotalAmount !== null) {
+    if (
+      !Number.isFinite(merged.targetTotalAmount) ||
+      merged.targetTotalAmount <= 0
+    ) {
+      return null
+    }
+  }
+
+  return savingsGoalsRepo.update(id, {
+    title: merged.title.trim(),
+    monthlyTargetAmount: merged.monthlyTargetAmount,
+    targetTotalAmount: merged.targetTotalAmount,
+    targetDeadlineDate: merged.targetDeadlineDate,
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+export function deleteSavingsGoal(id: string): boolean {
+  const current = savingsGoalsRepo.getById(id)
+  if (current) {
+    for (const c of current.contributions) {
+      const tid = c.transactionId?.trim()
+      if (tid) deleteTransaction(tid)
+    }
+  }
+  return savingsGoalsRepo.remove(id)
+}
+
+export function addSavingsGoalContribution(input: {
+  goalId: string
+  amount: number
+  accountId: string
+  date?: string
+  note?: string
+}): SavingsGoal | null {
+  migrateCategoriesFromLegacyOnce()
+  migrateTransactionsFromLegacyOnce()
+  const current = savingsGoalsRepo.getById(input.goalId)
+  if (!current) return null
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    throw new Error("Valor do aporte inválido.")
+  }
+  const accountId = input.accountId.trim()
+  if (!accountId) {
+    throw new Error("Selecione a conta.")
+  }
+  const acc = getAccountById(accountId)
+  if (!acc) {
+    throw new Error("Conta não encontrada.")
+  }
+  if (!acc.active) {
+    throw new Error("Use uma conta ativa.")
+  }
+  const date = input.date?.trim() || todayISODate()
+  const noteRaw = input.note?.trim()
+  const note = noteRaw && noteRaw.length > 0 ? noteRaw.slice(0, 500) : undefined
+  const categoryId = getOrCreateSavingsGoalExpenseCategoryId()
+  const baseDesc = `Meta: ${current.title}`
+  const description =
+    note && note.length > 0 ? `${note} · ${baseDesc}` : baseDesc
+
+  const tx = createTransaction({
+    title: `Cofrinho: ${current.title}`.slice(0, 120),
+    amount: input.amount,
+    type: "expense",
+    categoryId,
+    paymentMethod: "pix",
+    accountId,
+    date,
+    description: description.slice(0, 500),
+  })
+
+  const contribution = {
+    id: crypto.randomUUID(),
+    date,
+    amount: input.amount,
+    accountId,
+    transactionId: tx.id,
+    ...(note ? { note } : {}),
+  }
+  return savingsGoalsRepo.update(input.goalId, {
+    contributions: [...current.contributions, contribution],
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+export function removeSavingsGoalContribution(
+  goalId: string,
+  contributionId: string
+): SavingsGoal | null {
+  const current = savingsGoalsRepo.getById(goalId)
+  if (!current) return null
+  const hit = current.contributions.find((c) => c.id === contributionId)
+  if (!hit) return null
+  const tid = hit.transactionId?.trim()
+  if (tid) {
+    deleteTransaction(tid)
+  }
+  const next = current.contributions.filter((c) => c.id !== contributionId)
+  return savingsGoalsRepo.update(goalId, {
+    contributions: next,
+    updatedAt: new Date().toISOString(),
+  })
 }
 
 // ——— Parceladas ———

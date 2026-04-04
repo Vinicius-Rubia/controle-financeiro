@@ -57,3 +57,13 @@ export function todayISODate(): string {
   const day = String(d.getDate()).padStart(2, "0")
   return `${y}-${m}-${day}`
 }
+
+/** Converte `YYYY-MM-DD` armazenado para `Date` em fuso local (meio-dia evita DST). */
+export function isoDateToLocalDate(iso: string): Date {
+  const parts = iso.split("-").map(Number)
+  const y = parts[0]
+  const m = parts[1]
+  const d = parts[2]
+  if (!y || !m || !d) return new Date(NaN)
+  return new Date(y, m - 1, d)
+}
